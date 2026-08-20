@@ -59,9 +59,8 @@ class TlsSession:
     def __init__(self, preset: ImpersonationPreset = "chrome120") -> None:
         _validate_preset(preset)
         self._preset = preset
-        self._session: curl_requests.Session[Any] = curl_requests.Session()
-
-        self._session.impersonate = preset
+        self._session: curl_requests.Session = curl_requests.Session()
+        self._session.impersonate = preset  # type: ignore[attr-defined]
 
     # ------------------------------------------------------------------
     # Public methods
@@ -80,7 +79,6 @@ class TlsSession:
         resp: Response = self._session.request(
             method=method.upper(),
             url=url,
-
             headers=headers or {},
             data=data,
             params=params or {},
