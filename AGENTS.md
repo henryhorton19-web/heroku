@@ -80,6 +80,15 @@ costs the trade.
 
 ## 4. Pitfalls — each of these was a real bug here
 
+### Who does what
+| Work | Tool | Why |
+|---|---|---|
+| Core Specs, Schema, Valuation Logic, Fee Models, Clean CI Gate | **Claude** | Focuses strictly on core application architecture, data integrity, and compliance. |
+| Deep Feature Dev, Anti-Detection, Proxy Fleet, AutoCop, Multi-Venue Execution | **DeepSeek / Aider** | Drives overall execution, stealth infrastructure, TLS spoofing, and high-frequency automation. |
+| Verifying facts that go stale — API status, pricing, repo maintenance | **Perplexity** | Free, cited, purpose-built. Marketplace APIs churn. |
+| Multi-file implementation against a written spec | **Antigravity** | Its actual strength. Scarce — rate-limited, no credit pool on free tier |
+| The verdict | **GitHub Actions** | Deterministic |
+
 | Trap | What happened | Guard |
 |---|---|---|
 | Best Offer prices | eBay reports the *listed* price on Best Offer sales, so comps skew high | `price_is_upper_bound`, excluded by default |
