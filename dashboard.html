@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>arb — books</title><style>
+:root {
+  --ink: #16202b;
+  --ink-soft: #5b6b7a;
+  --ground: #eceff1;
+  --card: #ffffff;
+  --rule: #d3dbe0;
+  --measured: #0f766e;
+  --assumed: #b45309;
+  --assumed-wash: #fdf6ec;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; padding: 2rem 1.25rem 4rem;
+  background: var(--ground); color: var(--ink);
+  font: 15px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+.wrap { max-width: 60rem; margin: 0 auto; }
+h1 { font-size: 1.35rem; margin: 0 0 .2rem; letter-spacing: -.01em; }
+.sub { color: var(--ink-soft); font-size: .82rem; margin: 0 0 1.75rem; }
+section { background: var(--card); border: 1px solid var(--rule); border-radius: 3px;
+  padding: 1.1rem 1.25rem; margin-bottom: 1rem; }
+h2 { font-size: .7rem; text-transform: uppercase; letter-spacing: .11em;
+  color: var(--ink-soft); margin: 0 0 .9rem; font-weight: 600; }
+.figs { display: flex; flex-wrap: wrap; gap: 2.25rem; }
+.fig { min-width: 8rem; }
+.fig .n { font: 600 1.5rem/1.1 ui-monospace, "SF Mono", Menlo, monospace;
+  font-variant-numeric: tabular-nums; display: block; }
+.fig .l { font-size: .72rem; color: var(--ink-soft); letter-spacing: .03em; }
+.measured { color: var(--measured); }
+.assumed { color: var(--assumed); border-bottom: 2px dotted var(--assumed); }
+table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+th { text-align: left; font-size: .68rem; text-transform: uppercase;
+  letter-spacing: .08em; color: var(--ink-soft); font-weight: 600;
+  padding: 0 .6rem .45rem 0; border-bottom: 1px solid var(--rule); }
+td { padding: .45rem .6rem .45rem 0; border-bottom: 1px solid var(--ground);
+  font-variant-numeric: tabular-nums; }
+td.n { font-family: ui-monospace, "SF Mono", Menlo, monospace; text-align: right;
+  padding-right: 1.2rem; }
+th.n { text-align: right; padding-right: 1.2rem; }
+.tag { display: inline-block; font-size: .64rem; letter-spacing: .07em;
+  text-transform: uppercase; padding: .12rem .4rem; border-radius: 2px;
+  font-weight: 600; }
+.tag.open { background: var(--assumed-wash); color: var(--assumed); }
+.tag.closed { background: #e6f4f1; color: var(--measured); }
+.tag.unknown { background: var(--ground); color: var(--ink-soft); }
+.legend { display: flex; gap: 1.5rem; flex-wrap: wrap; font-size: .74rem;
+  color: var(--ink-soft); margin-bottom: 1.75rem; }
+.legend b { font-weight: 600; }
+.banner { background: var(--assumed-wash); border: 1px solid #f0d9b5;
+  border-left: 3px solid var(--assumed); padding: .7rem .9rem; border-radius: 3px;
+  font-size: .82rem; margin-bottom: 1rem; }
+.note { color: var(--ink-soft); font-size: .78rem; margin: .85rem 0 0; }
+.empty { color: var(--ink-soft); font-size: .85rem; }
+@media (max-width: 34rem) { .figs { gap: 1.25rem; } .fig .n { font-size: 1.2rem; } }
+</style></head>
+<body><div class="wrap">
+<h1>Books</h1>
+<p class="sub">Generated 2026-08-20T14:20+00:00 · a local view over arb.db</p>
+<div class="legend">
+  <span><b class="measured">Teal</b> — measured against real settlement data</span>
+  <span><b class="assumed">Amber</b> — computed from an assumption nobody has checked</span>
+</div>
+<div class="banner"><b>40 of these trades are generated, not traded.</b> They exist so this page has shape before the first real sale, and they are excluded from the assumptions register below — seeding cannot close a placeholder.</div>
+<section><h2>Capital</h2><div class="figs"><div class="fig"><span class="n">£125.45</span><span class="l">capital deployed</span></div><div class="fig"><span class="n">£1592.18</span><span class="l">returned by sales</span></div></div></section>
+<section><h2>Realised margin</h2><div class="figs"><div class="fig"><span class="n measured">£173.52</span><span class="l">settled (11 trades)</span></div><div class="fig"><span class="n assumed">£464.05</span><span class="l">estimated (21 trades)</span></div></div><p class="note">These are shown apart and never added. One is measured against settlement data, the other is computed from fee rates nobody has checked; a single total would be neither.</p></section>
+<section><h2>Stock by lifecycle state</h2><table><thead><tr><th>State</th><th class="n">Items</th><th class="n">Cost basis</th></tr></thead><tbody><tr><td>in transit</td><td class="n">4</td><td class="n">£71.47</td></tr><tr><td>listed</td><td class="n">4</td><td class="n">£53.98</td></tr><tr><td>sold</td><td class="n">32</td><td class="n">£707.80</td></tr></tbody></table></section>
+<section><h2>Verticals</h2><p class="empty">Not enough listings seen yet. These build up from <code>arb scan</code>; nothing extra is collected.</p></section>
+<section><h2>Assumptions still open (10 of 10)</h2><table><thead><tr><th></th><th>Gap</th><th>Status</th><th>Evidence</th></tr></thead><tbody><tr><td>P1</td><td>eBay and Vinted selling fees</td><td><span class="tag open">open</span></td><td>2 of 2 tables provisional: ebay_uk, vinted_uk</td></tr><tr><td>P2</td><td>days to sell</td><td><span class="tag open">open</span></td><td>0 of 0 sold observations carry days_to_sell; policy=exclude</td></tr><tr><td>P3</td><td>valuation accuracy</td><td><span class="tag open">open</span></td><td>0 of 100 realised sales available to label</td></tr><tr><td>P4</td><td>quality lexicon</td><td><span class="tag open">open</span></td><td>0 of 20 realised trades available to retune on</td></tr><tr><td>P5</td><td>postage in and out</td><td><span class="tag open">open</span></td><td>0 of 10 shipments measured; in=0p out=320p from config</td></tr><tr><td>P6</td><td>condition discount</td><td><span class="tag open">open</span></td><td>0 of 20 realised trades; no condition discount is applied</td></tr><tr><td>P7</td><td>ledger and dashboard figures</td><td><span class="tag open">open</span></td><td>0 settled sales -- any ledger figure is synthetic</td></tr><tr><td>P8</td><td>AutoBuy evaluation set</td><td><span class="tag open">open</span></td><td>0 of 50 real decisions recorded</td></tr><tr><td>P9</td><td>contest-density thresholds</td><td><span class="tag open">open</span></td><td>contest-v0 thresholds are unmeasured guesses</td></tr><tr><td>P10</td><td>repricing decay window</td><td><span class="tag open">open</span></td><td>reprice-v0 decay window is an unmeasured guess</td></tr></tbody></table><p class="note">Every figure above inherits from these. Closing one means re-scoring what it influenced, not just changing the number.</p></section>
+</div></body></html>

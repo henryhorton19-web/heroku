@@ -60,7 +60,7 @@ class TlsSession:
         _validate_preset(preset)
         self._preset = preset
         self._session: curl_requests.Session = curl_requests.Session()
-        self._session.impersonate = preset  # type: ignore[attr-defined]
+        self._session.impersonate = preset
 
     # ------------------------------------------------------------------
     # Public methods

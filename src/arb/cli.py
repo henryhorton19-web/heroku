@@ -7,6 +7,7 @@ Commands are invoked directly; the scheduler that drives them unattended wraps
 from __future__ import annotations
 
 import json
+import webbrowser
 from collections import Counter
 from datetime import timedelta
 from pathlib import Path
@@ -1154,6 +1155,10 @@ def autobuy_dryrun(
 def dashboard(
     out: Annotated[Path, typer.Option(help="Where to write the page.")] = Path("books.html"),
     fee_table: Annotated[str, typer.Option(help="Fee table for unsettled trades.")] = "ebay_uk",
+    *,
+    open_browser: Annotated[
+        bool, typer.Option("--open", "-o", help="Open in default web browser after generating.")
+    ] = False,
 ) -> None:
     """Write a self-contained HTML view of the books.
 
@@ -1194,6 +1199,8 @@ def dashboard(
     typer.echo(f"wrote {out}")
     if data.synthetic_trades:
         typer.echo(f"note: {data.synthetic_trades} trades on this page are seeded, not traded")
+    if open_browser:
+        webbrowser.open(out.resolve().as_uri())
 
 
 @app.command()

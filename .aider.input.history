@@ -99,3 +99,66 @@
 
 # 2026-08-20 15:52:10.929524
 +Y
+
+# 2026-08-20 16:08:28.808547
++Agent Codename: Your codename is Shadow. Absolute Directory Isolation: All Shadow engine development MUST take place in the top-level directory engine/ and isolated test directory tests_engine/. DO NOT EDIT OR TOUCH any files inside src/arb/ or tests/ (which belong to Horse / Claude). Integration into src/arb/ will happen at a later date.
+
+# 2026-08-20 16:14:20.555624
++/clear
+
+# 2026-08-20 16:14:27.188723
++Shadow, please proceed with the isolated buildout of Phase 2 (CAPTCHA Solving Pipeline) and Phase 3 (AutoCop Checkout Engine).
++
++STRICT LANGUAGE & ISOLATION RULES FOR SHADOW:
++- DO NOT speak, respond, or write in Dutch under any circumstances. ALL chat responses, code, comments, docstrings, and CLI output MUST be in ENGLISH.
++- All code MUST be created under top-level `engine/` and `tests_engine/`.
++- DO NOT edit or touch any files in `src/arb/` or `tests/` (Horse's domain).
++- Ensure mypy --strict passes, ruff check and format pass, scripts/guard.py passes, and pytest tests_engine achieves >=85% coverage.
++
++---
++
++Phase 2 Action Items: CAPTCHA Solving Pipeline (`engine/captcha.py`)
++
++1. Config Updates (`engine/config.py`):
++   - Add `capsolver_api_key: str | None = Field(default=None, alias="ENGINE_CAPSOLVER_API_KEY")`
++   - Add `captcha_2captcha_api_key: str | None = Field(default=None, alias="ENGINE_2CAPTCHA_API_KEY")`
++
++2. CAPTCHA Solver Implementation (`engine/captcha.py`):
++   - Create `CaptchaSolver` class initializing API keys from `EngineSettings`.
++   - Implement `async def solve_turnstile(site_key: str, page_url: str) -> str`:
++     - Tries CapSolver API first if key present; falls back to 2Captcha.
++     - Raises `CaptchaError` if no keys present or solving fails/times out.
++   - Implement `async def solve_hcaptcha(site_key: str, page_url: str) -> str`.
++   - Implement `async def solve_recaptcha(site_key: str, page_url: str) -> str`.
++   - Add unit tests in `tests_engine/test_captcha.py` (mocking external HTTP solver APIs with `httpx` or `respx`).
++
++3. Integration with TLS Client (`engine/tls.py`):
++   - Add `detect_captcha(response: Response) -> tuple[str, str] | None` helper identifying Turnstile/hCaptcha challenge pages & sitekeys.
++   - Support passing `captcha_solver: CaptchaSolver | None` into `TlsSession.request()`.
++
++---
++
++Phase 3 Action Items: AutoCop Checkout Engine (`engine/autocop.py`)
++
++1. Config Updates (`engine/config.py`):
++   - Add `autocop_enabled: bool = Field(default=False, alias="ENGINE_AUTOCOP_ENABLED")`
++   - Add `autocop_max_spend_pence: int = Field(default=5000, alias="ENGINE_AUTOCOP_MAX_SPEND_PENCE")`
++
++2. AutoCop Checkout Engine (`engine/autocop.py`):
++   - Create dataclass `PurchaseAttemptResult(success: bool, listing_id: str, price_pence: int, transaction_id: str | None, error: str | None)`.
++   - Implement `async def attempt_checkout(listing_id: str, title: str, price_pence: int, tls_session: TlsSession, proxy_pool: ProxyPool, solver: CaptchaSolver | None = None, dry_run: bool = True) -> PurchaseAttemptResult`:
++     - Step 1: Enforce spend cap (`price_pence <= settings.autocop_max_spend_pence`).
++     - Step 2: Fetch checkout parameters / payment methods (`/paymentMethods` endpoint pattern).
++     - Step 3: Initialize tokenized payment session (`/sessions`).
++     - Step 4: Submit payment payload. If dry_run=True, simulate network calls and log payload without charging.
++   - Add unit tests in `tests_engine/test_autocop.py` (mocking payment responses).
++
++3. CLI Integration (`engine/cli.py`):
++   - Add `@app.command() def autocop(listing_id: str, title: str, price_pence: int, dry_run: bool = typer.Option(True, help="Simulate payment without charging"))` command.
++
++---
++
++Verification:
++- Run `uv run ruff check engine/ tests_engine/` and `uv run ruff format --check engine/ tests_engine/`
++- Run `uv run mypy --strict engine/` (must pass strict mode with 0 raw Any)
++- Run `uv run pytest tests_engine --cov=engine` (ensure coverage >= 85%)
