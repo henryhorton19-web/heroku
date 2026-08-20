@@ -13,9 +13,7 @@ class TestDetectCaptcha:
 
     def test_turnstile_detected(self) -> None:
         mock_resp = MagicMock()
-        mock_resp.text = (
-            '<div class="cf-turnstile" data-sitekey="0x4AAAAAAA"></div>'
-        )
+        mock_resp.text = '<div class="cf-turnstile" data-sitekey="0x4AAAAAAA"></div>'
         result = detect_captcha(mock_resp)
         assert result is not None
         assert result[0] == "turnstile"
@@ -23,9 +21,7 @@ class TestDetectCaptcha:
 
     def test_hcaptcha_detected(self) -> None:
         mock_resp = MagicMock()
-        mock_resp.text = (
-            '<div class="h-captcha" data-sitekey="abc-def"></div>'
-        )
+        mock_resp.text = '<div class="h-captcha" data-sitekey="abc-def"></div>'
         result = detect_captcha(mock_resp)
         assert result is not None
         assert result[0] == "hcaptcha"
@@ -33,9 +29,7 @@ class TestDetectCaptcha:
 
     def test_recaptcha_detected(self) -> None:
         mock_resp = MagicMock()
-        mock_resp.text = (
-            '<div class="g-recaptcha" data-sitekey="6Lc..."></div>'
-        )
+        mock_resp.text = '<div class="g-recaptcha" data-sitekey="6Lc..."></div>'
         result = detect_captcha(mock_resp)
         assert result is not None
         assert result[0] == "recaptcha"

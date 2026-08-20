@@ -162,3 +162,52 @@
 +- Run `uv run ruff check engine/ tests_engine/` and `uv run ruff format --check engine/ tests_engine/`
 +- Run `uv run mypy --strict engine/` (must pass strict mode with 0 raw Any)
 +- Run `uv run pytest tests_engine --cov=engine` (ensure coverage >= 85%)
+
+# 2026-08-20 16:40:40.878244
++Y
+
+# 2026-08-20 16:41:12.504066
++Shadow, please proceed with the isolated buildout of Phase 4 (AdsPower & Stealth Anti-Detect Fleet) and Phase 5 (Multi-Channel Cross-Lister & Auto-Delist Sync).
++STRICT LANGUAGE & ISOLATION RULES FOR SHADOW:
++- DO NOT speak, respond, or write in Dutch under any circumstances. ALL chat responses, code, comments, docstrings, and CLI output MUST be in ENGLISH.
++- All code MUST be created under top-level `engine/` and `tests_engine/`.
++- DO NOT edit or touch any files in `src/arb/` or `tests/` (Horse's domain).
++- Ensure mypy --strict passes, ruff check and format pass, scripts/guard.py passes, and pytest tests_engine achieves >=85% coverage.
++---
++Phase 4 Action Items: AdsPower & Stealth Anti-Detect Fleet (`engine/adspower.py`)
++1. Config Updates (`engine/config.py`):
++   - Add `adspower_api_url: str = Field(default="http://local.adspower.net:50325", alias="ENGINE_ADSPOWER_API_URL")`
++   - Add `adspower_group_id: str | None = Field(default=None, alias="ENGINE_ADSPOWER_GROUP_ID")`
++2. AdsPower Client Implementation (`engine/adspower.py`):
++   - Create dataclass `BrowserProfile(profile_id: str, name: str, proxy: str | None, status: str)`.
++   - Create `AdsPowerClient` class interacting with AdsPower Local REST API:
++     - `async def create_profile(name: str, proxy_url: str | None = None) -> BrowserProfile`:
++       - Posts payload to `/api/v1/user/create` with bound proxy and customized WebGL/Canvas fingerprinting settings.
++     - `async def start_browser(profile_id: str) -> str`:
++       - Calls `/api/v1/browser/start?user_id={profile_id}` and returns WebSocket / CDP debugging endpoint URL.
++     - `async def stop_browser(profile_id: str) -> bool`:
++       - Calls `/api/v1/browser/stop?user_id={profile_id}`.
++   - Add unit tests in `tests_engine/test_adspower.py` (mocking AdsPower HTTP endpoints using `httpx` or `respx`).
++---
++Phase 5 Action Items: Multi-Channel Cross-Lister & Auto-Delist Sync (`engine/crosslister.py`)
++1. Config Updates (`engine/config.py`):
++   - Add `crosslister_enabled: bool = Field(default=False, alias="ENGINE_CROSSLISTER_ENABLED")`
++2. Cross-Lister Implementation (`engine/crosslister.py`):
++   - Create dataclass `DelistResult(success: bool, inventory_id: str, venue: str, external_id: str, error: str | None)`.
++   - Implement `async def delist_item(inventory_id: str, venue: str, external_id: str, tls_session: TlsSession, proxy_pool: ProxyPool) -> DelistResult`:
++     - Sends venue-specific API or automated requests to immediately unlist or pause active seller listings on Vinted, eBay, Depop, Poshmark, or Mercari.
++     - Guarantees execution within <500ms of sale detection.
++   - Implement `async def publish_listing(item_data: dict[str, Any], target_venues: list[str]) -> dict[str, str]`:
++     - Duplicates and publishes listings across target venues.
++   - Add unit tests in `tests_engine/test_crosslister.py`.
++3. CLI Integration (`engine/cli.py`):
++   - Add `@app.command() def delist(inventory_id: str, venue: str, external_id: str)` command.
++   - Add `@app.command() def adspower_status()` command.
++---
++Verification:
++- Run `uv run ruff check engine/ tests_engine/` and `uv run ruff format --check engine/ tests_engine/`
++- Run `uv run mypy --strict engine/` (must pass strict mode with 0 raw Any)
++- Run `uv run pytest tests_engine --cov=engine` (ensure coverage >= 85%)
+
+# 2026-08-20 16:41:17.359463
++Y

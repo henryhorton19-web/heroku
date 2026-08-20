@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 from engine.autocop import AutoCopError, PurchaseAttemptResult, attempt_checkout
-from engine.config import EngineSettings, get_engine_settings
+from engine.config import get_engine_settings
 from engine.proxy import ProxyPool
 from engine.tls import TlsSession
 

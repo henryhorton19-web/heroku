@@ -16,7 +16,6 @@ providers fail.
 from __future__ import annotations
 
 import asyncio
-import json
 from dataclasses import dataclass
 from typing import Any
 
@@ -232,7 +231,9 @@ class CaptchaSolver:
             )
             create_data = create_resp.json()
             if create_data.get("errorId") not in (0, None):
-                msg = f"CapSolver createTask error: {create_data.get('errorDescription', 'unknown')}"
+                msg = (
+                    f"CapSolver createTask error: {create_data.get('errorDescription', 'unknown')}"
+                )
                 raise CaptchaError(msg)
 
             task_id = create_data["taskId"]

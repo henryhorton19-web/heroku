@@ -60,9 +60,35 @@ class LifecycleState(StrEnum):
     """
 
     SCOUTED = "scouted"
+    SNIPED = "sniped"
     IN_TRANSIT = "in_transit"
+    ENHANCED = "enhanced"
     LISTED = "listed"
     SOLD = "sold"
+
+    @property
+    def order(self) -> int:
+        return _STATE_ORDER[self]
+
+
+_STATE_ORDER: dict[LifecycleState, int] = {
+    LifecycleState.SCOUTED: 0,
+    LifecycleState.SNIPED: 1,
+    LifecycleState.IN_TRANSIT: 2,
+    LifecycleState.ENHANCED: 3,
+    LifecycleState.LISTED: 4,
+    LifecycleState.SOLD: 5,
+}
+"""Explicit order. Enum definition order is load-bearing nowhere else in this
+codebase, and a pipeline that silently reorders when someone adds a state would be
+worse than one that fails to compile."""
+
+FUNDS_CLEARED = "funds_cleared"
+"""The seventh pipeline stage, and the only one that is **derived rather than
+stored**. An item is sold when the buyer pays and cleared when settlement data
+arrives, which is a fact about `actual_fees_pence`, not a state anyone sets. Storing
+it would create a state that must be kept in sync with a column that already answers
+the question."""
 
 
 class RealisedTrade(NamedTuple):

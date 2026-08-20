@@ -7,7 +7,6 @@ Commands are invoked directly; the scheduler that drives them unattended wraps
 from __future__ import annotations
 
 import json
-import webbrowser
 from collections import Counter
 from datetime import timedelta
 from pathlib import Path
@@ -15,6 +14,7 @@ from typing import TYPE_CHECKING, Annotated
 
 import apprise
 import typer
+import uvicorn
 from alembic import command
 from pydantic import ValidationError
 from sqlalchemy import func, select
@@ -1155,10 +1155,6 @@ def autobuy_dryrun(
 def dashboard(
     out: Annotated[Path, typer.Option(help="Where to write the page.")] = Path("books.html"),
     fee_table: Annotated[str, typer.Option(help="Fee table for unsettled trades.")] = "ebay_uk",
-    *,
-    open_browser: Annotated[
-        bool, typer.Option("--open", "-o", help="Open in default web browser after generating.")
-    ] = False,
 ) -> None:
     """Write a self-contained HTML view of the books.
 
@@ -1199,8 +1195,6 @@ def dashboard(
     typer.echo(f"wrote {out}")
     if data.synthetic_trades:
         typer.echo(f"note: {data.synthetic_trades} trades on this page are seeded, not traded")
-    if open_browser:
-        webbrowser.open(out.resolve().as_uri())
 
 
 @app.command()
@@ -1260,3 +1254,26 @@ def hazard_check() -> None:
             err=True,
         )
     raise typer.Exit(code=1)
+
+
+@app.command()
+def web(
+    port: Annotated[int, typer.Option(help="Port to serve on.")] = 8000,
+    host: Annotated[str, typer.Option(help="Bind address.")] = "127.0.0.1",
+) -> None:
+    """Serve the trading console at http://127.0.0.1:8000.
+
+    Binds to loopback by default, deliberately. The console exposes the full ledger,
+    every purchase decision and the tax position, and it has no authentication --
+    adding auth to a single-user local tool is machinery that protects nothing while
+    implying it protects something. The bind address *is* the protection, so widening
+    it is a deliberate act and is warned about below.
+    """
+    if host not in {"127.0.0.1", "localhost", "::1"}:
+        typer.echo(
+            f"WARNING: binding to {host} exposes your ledger, decisions and tax "
+            "position to the network with no authentication.",
+            err=True,
+        )
+    typer.echo(f"console on http://{host}:{port}")
+    uvicorn.run("arb.web.app:create_app", host=host, port=port, factory=True, log_level="warning")
