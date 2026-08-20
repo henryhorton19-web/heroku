@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-
 from engine.cli import app as engine_app
 from typer.testing import CliRunner
 
@@ -27,5 +26,3 @@ def test_engine_monitor_enabled() -> None:
         mock_settings.return_value.tls_preset = "chrome120"
         result = runner.invoke(engine_app, ["--keyword", "nike", "--max-price", "20.0"])
         assert result.exit_code == 0
-
-

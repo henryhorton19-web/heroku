@@ -58,6 +58,7 @@ from arb.provenance import PlaceholderStatus, gather, resolve
 from arb.refdata import load_reference_data
 from arb.repo import record_decision, top_opportunities, upsert_listing, write_opportunity
 from arb.selling.aspects_repo import cached_aspects, cached_categories, store_aspects
+from arb.selling.crossvenue import HazardKind, hazards, unresolved_delists
 from arb.selling.finances import parse_transactions
 from arb.selling.labels import merge_labels
 from arb.selling.reprice import RepriceContext, offer_ladder, reprice
@@ -1211,3 +1212,44 @@ def seed(
         created = seed_synthetic_trades(session, now=utcnow(), count=count)
     typer.echo(f"seeded {created} synthetic trades")
     typer.echo("these cannot close a placeholder -- check with `arb provenance`")
+
+
+@app.command()
+def hazard_check() -> None:
+    """Report anything at risk of being sold twice across venues.
+
+    A query over state, not a replay of events, so it is correct after a crash, a
+    missed webhook, or a period when nothing was running. Exits non-zero when
+    anything is live that should not be, so it can be scheduled as a guard.
+    """
+    settings = get_settings()
+    engine = make_engine(settings.db_url)
+    with session_scope(engine) as session:
+        found = hazards(session)
+        pending = len(unresolved_delists(session))
+
+    if not found:
+        typer.echo(f"no double-sale hazards ({pending} de-lists in flight)")
+        return
+
+    for hazard in found:
+        detail = f"  {hazard.detail}" if hazard.detail else ""
+        typer.echo(
+            f"{hazard.kind.value:<18} item {hazard.inventory_id:<5} "
+            f"{hazard.venue}:{hazard.external_id}{detail}"
+        )
+    worst = {h.kind for h in found}
+    typer.echo("")
+    if HazardKind.SOLD_TWICE in worst:
+        typer.echo(
+            "SOLD TWICE: already happened. Refund the second buyer before they chase "
+            "it -- a defect raised by a buyer costs more than one you raise yourself.",
+            err=True,
+        )
+    if HazardKind.LIVE_AFTER_SALE in worst:
+        typer.echo(
+            "LIVE AFTER SALE: sold elsewhere and still buyable, with nothing in "
+            "flight. Nothing will fix this on its own.",
+            err=True,
+        )
+    raise typer.Exit(code=1)

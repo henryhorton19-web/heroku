@@ -8,9 +8,6 @@
 
 A personal reselling tool aimed at maximising profit.
 
-**Language Standard:** All engineering documentation, code, comments, specs, CLI output, and agent communication MUST be conducted strictly in **English**.
-
-
 ---
 
 ## 2. Phases, and the hard boundary between them
@@ -46,40 +43,17 @@ protocols in `src/arb/protocols.py`, and the forward data capture in §4.4. Noth
 ## 3. Phase 1 scope
 
 ### In
-# FEATURE ROADMAP: VINTED ARBITRAGE & RESELLING ENGINE
+- Valuation: what an item sells for, how fast, with a confidence figure
+- Buy-side discovery: scan Vinted, rank candidates by return on capital
+- Quality filtering: exclude damaged, flawed, mis-sized, ambiguous listings
+- Sell-side production: listing copy, photos, publish to Vinted and eBay
+- Sell-side operations: repricing, offer ladders, shipping labels
+- Books: cost basis, real fees, realised margin, capital deployed, UK tax output
 
-## 1. Business Management Dashboard (The Hub)
-* **Real-Time Analytics:** Live tracking of profit margins, net profit, monthly run-rate, and revenue breakdown.
-* **Task & Queue Management:** Visual kanban/list view of pending worker tasks (photo enhancement, listings, shipments).
-* **Inventory State Machine:** Track items through `Scouted` -> `Sniped` -> `In-Transit` -> `Enhanced` -> `Listed` -> `Sold` -> `Funds Cleared`.
-* **Advanced Fee Calculator:** Pre-compute net margins deducting buyer protection, shipping, and marketplace fees.
-* **Shipping Label Processor:** Auto-detect carriers, crop, and merge PDF labels for bulk printing.
-* **Automated Accounting:** Expense logging, recurring costs, SKU generation, and tax-ready exports.
-* **Goal Tracking:** Progress bars against £2K+ monthly revenue/profit targets.
-
-## 2. Buyside Engine (Sourcing & Sniping)
-* **Sub-Millisecond Monitoring:** Zero-delay polling to detect new Vinted listings (target: <0.2ms latency).
-* **Custom Filtering:** Real-time scanning for specific brands, sizes, price caps, and keywords.
-* **Deal Identification & Profit Filter:** Algorithmic pricing comparison against historical median sold data for true ROI.
-* **AutoBuy (One-Tap):** Discord/Webhook push notifications for manual one-click checkout on underpriced items.
-* **AutoCop (Unattended Checkout):** 24/7 headless worker to reserve items, select shipping, and process payment autonomously.
-* **Wholesale & Drop Alerts:** Secondary monitors for retail price errors, clearance drops, and sneaker releases.
-
-## 3. Sellside Engine (Asset Enhancement & Cross-Listing)
-* **Event-Driven Handoff:** Auto-route acquired Buyside inventory data directly to the Sellside processing queue.
-* **AI Photo Enhancer:** Background removal, EXIF scrubbing, and application of premium studio/daylight overlays.
-* **AI Listing Generator:** LLM-powered generation of SEO titles, condition descriptions, and platform-specific hashtags.
-* **Price Estimator:** AI-driven sell price recommendations based on live comps and confidence ranges.
-* **Multi-Channel Cross-Lister:** API/headless scripts to publish enhanced listings to eBay, Depop, Poshmark, and Mercari.
-* **Automated Reposting:** Extract, crop, and re-upload stale listings to manipulate algorithms and boost views.
-* **Inventory Sync (Multi-Channel Lock):** Auto-delist an item from all secondary platforms the moment it sells on one.
-
-## 4. Anti-Detection & Infrastructure
-* **TLS & JA3 Spoofing:** `curl_cffi` / `tls-client` integration to bypass Cloudflare and DataDome WAFs.
-* **Proxy Fleet Management:** Auto-rotation of residential and sticky ISP proxies assigned per checkout task.
-* **Stealth Browser Profiles:** AdsPower/Multilogin integration to isolate synthetic buyer accounts from main seller accounts.
-* **CAPTCHA Solving Pipeline:** Automated routing of hCaptcha/Turnstile challenges to CapSolver or 2Captcha APIs.
-* **Financial Guardrails:** Hard-coded daily spend caps, idempotency keys (prevent duplicate buys), and a master kill-switch.
+### Out
+Monitors and alerting · automated purchasing · niche finder · seller intelligence ·
+wholesale and bundle economics · discount monitors · web monitors ·
+wardrobe/disappearance tracking · multi-marketplace · arbitrage engine.
 
 ---
 
@@ -92,7 +66,20 @@ cannot pass. **Never weaken the gate to make something pass.** No `# type: ignor
 no dropped lint rules, no relaxed strict mode. If a rule genuinely can't be
 satisfied, stop and escalate.
 
+### 4.8 Don't build what you can install
+Author only what is genuinely ours: fee tables, valuation and ranking, the quality
+lexicon, venue glue, and one LLM extraction prompt. Everything else — HTTP, retries,
+ORM, PDF handling, image segmentation, fuzzy matching, CLI, config — is an installed
+dependency. Before writing a module, check whether a maintained package already does
+it; reimplementing a dependency is the failure mode this rule exists to prevent.
+
+### 4.10 Precision over recall on anything that spends money
+A missed opportunity costs nothing. A false positive costs the trade. Every
+threshold — comp count, match confidence, quality filter — is tuned accordingly.
+Refuse to produce an estimate rather than produce a confident-looking wrong one.
+
 ---
+
 ## 5. Repo
 
 **`github.com/henryhorton19-web/heroku`** — public.

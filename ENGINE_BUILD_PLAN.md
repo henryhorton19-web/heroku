@@ -110,6 +110,7 @@ def engine_monitor(
         raise typer.Exit(1)
     # start asyncio loop met engine.monitor.run(interval)
 
+
 @app.command()
 def engine_autocop(
     ctx: typer.Context,
@@ -117,6 +118,7 @@ def engine_autocop(
 ) -> None:
     """Start AutoCop checkout worker."""
     # ...
+
 
 @app.command()
 def engine_crosslist(

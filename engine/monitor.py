@@ -142,8 +142,9 @@ async def poll_vinted(
         return []
 
     try:
-        data = response.json()  # type: ignore[no-untyped-call]
+        data = response.json()
     except (json.JSONDecodeError, ValueError):
+
         return []
 
     items = data.get("items", []) if isinstance(data, dict) else []

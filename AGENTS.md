@@ -10,14 +10,11 @@ Operating brief for a coding agent building this to beta. Read this, then
 A personal reselling tool. Buy underpriced clothing on Vinted, sell it on eBay, and
 keep one honest ledger. Python 3.12, SQLite, uv, mypy strict.
 
-**Language Constraint:** All code, docstrings, comments, commit messages, documentation, CLI outputs, and LLM agent responses MUST be written exclusively in **English**. Do not write or generate output in Dutch or any other non-English language.
-
-
 **Working today** (354 tests, CI green):
 valuation · fee model · comp matching · append-only comps cache · SoldComps adapter ·
 quality filter · contest-density filter · pure scanner · capital-velocity ranking ·
 Vinted read adapter · placeholder register · eBay taxonomy compliance gate ·
-`arb scan` / `buylist` / `decide` / `provenance` / `taxonomy` / `reconcile-fees` / `reprice` / `books` / `labels` / `tax` / `monitor` / `autobuy` / `dashboard` / `seed`.
+`arb scan` / `buylist` / `decide` / `provenance` / `taxonomy` / `reconcile-fees` / `reprice` / `books` / `labels` / `tax` / `monitor` / `autobuy` / `dashboard` / `seed` / `hazard-check`.
 
 **To build:** sellside publishing, books, dashboard, automation, multi-venue. See
 `ROADMAP.md` §3–§7. All five workstreams are unblocked and can run in parallel.
@@ -82,15 +79,6 @@ costs the trade.
 ---
 
 ## 4. Pitfalls — each of these was a real bug here
-
-### Who does what
-| Work | Tool | Why |
-|---|---|---|
-| Verifying facts that go stale — API status, pricing, repo maintenance | **Perplexity** | Free, cited, purpose-built. Marketplace APIs churn. |
-| Specs, schema, money maths, test design, diff review | **Claude** | Abundant, and correctness matters most here |
-| Multi-file implementation against a written spec | **Antigravity** | Its actual strength. Scarce — rate-limited, no credit pool on free tier |
-| The verdict | **GitHub Actions** | Deterministic |
-
 
 | Trap | What happened | Guard |
 |---|---|---|
@@ -180,7 +168,8 @@ src/arb/
   cli.py            typer
   comps/            fees · valuation · matching · cache · service · soldcomps
   sourcing/         quality · contest · rank · scanner · vinted · sweep
-  selling/          taxonomy gate · aspect cache · settlement parsing · repricing · labels
+  selling/          taxonomy · aspects · settlement · repricing · labels ·
+                    crossvenue (double-sale prevention) · vinted_sell
   books/            ledger, capital and ageing · reconciliation · UK tax · verticals
   dashboard.py      self-contained HTML; colour encodes measured vs assumed
   data/fees/        versioned YAML fee tables

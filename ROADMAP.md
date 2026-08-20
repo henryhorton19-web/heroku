@@ -99,7 +99,7 @@ payload, and `SellVenue` already is one.
 | Contest-density filter over `favourites` / `views` | done | — |
 | `arb provenance` — the register above | done | — |
 | Live Vinted session auth | open — needs credentials | 0.5d |
-| `backtest.py` — closes **P3** | open — needs 100 labelled items | 1d |
+| `backtest.py` — harness done; closes **P3** on 100 labelled items | done |
 
 **Running on placeholders:** P2 (velocity), P3 (accuracy), P4 (lexicon), P5 (postage).
 None block anything. Run `VelocityPolicy.ASSUME_DEFAULT` and read `NET` and `CONF`
@@ -214,10 +214,10 @@ excellent and premature — revisit when one process genuinely cannot keep up.
 
 | Task | Effort |
 |---|---|
-| Vinted as `SellVenue` | 2d |
+| Vinted as `SellVenue` | done |
 | Depop adapter | 3d |
 | Poshmark / Mercari adapters | 4d |
-| Cross-venue reconciliation and de-listing on sale | 2d |
+| Cross-venue reconciliation and de-listing on sale | done (built first) |
 
 **De-listing on sale is the part that bites.** Selling the same item twice across two
 venues costs a refund, a defect, and sometimes the account. Build reconciliation

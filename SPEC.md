@@ -1,7 +1,7 @@
 # SPEC — current module contract
 
 **M1 buyside 95%. M2 sellside: all buildable items done. M3 books: complete. M4: sweep, monitors and AutoBuy rails done; execution deliberately blocked.
-M5 not started.**
+M5: reconciliation and Vinted SellVenue done.**
 Updated 20 Aug 2026. This file is the contract; `CONTEXT.md` is the standing policy.
 
 ---
@@ -36,6 +36,9 @@ Updated 20 Aug 2026. This file is the contract; `CONTEXT.md` is the standing pol
 | `arb/autobuy.py` | Purchase authorisation. Pure, fails closed, never executes. | 215 |
 | `arb/books/verticals.py` | Niche aggregates + synthetic seed. Seed rows cannot close a gap. | 160 |
 | `arb/dashboard.py` | One self-contained HTML file. Colour encodes provenance. | 245 |
+| `arb/selling/crossvenue.py` | Double-sale prevention. Intent before call; hazards from state. | 235 |
+| `arb/selling/vinted_sell.py` | Vinted `SellVenue`. Registers before publishing. | 175 |
+| `arb/comps/backtest.py` | P3's mechanism. Refuses below 100 labelled items. | 120 |
 | `arb/sourcing/rank.py` | Capital-velocity ranking + the unknown-velocity policy. | 120 |
 | `arb/sourcing/scanner.py` | `scan()` — **pure function**; monitors and AutoBuy wrap it. | 75 |
 | `arb/sourcing/vinted.py` | `BuyVenue` adapter. Pure mapping split from the network call. | 105 |
@@ -50,7 +53,7 @@ Updated 20 Aug 2026. This file is the contract; `CONTEXT.md` is the standing pol
 The modules are heavily commented because the reasoning behind a threshold is the
 thing that gets lost, not the threshold itself.
 
-Gate status: ruff clean, mypy strict clean, 550 tests, 88% coverage. Full CI gate
+Gate status: ruff clean, mypy strict clean, 596 tests, 88% coverage. Full CI gate
 verified locally including migrate-from-empty and `uv lock --check`.
 
 ---
@@ -824,3 +827,62 @@ seeding 20 rows and seeding 40 agree about the first 20, which a seeded RNG woul
 scan for exactly this. The table reads **margin against watchers**, because margin
 alone is half a picture: a high-margin niche with forty watchers per listing is one
 you lose races in.
+
+---
+
+## 23. Cross-venue reconciliation — built before the thing it catches
+
+Listing one item on two venues is a few hours of adapter work. Selling it twice costs a
+refund, a defect, and sometimes the account. So this landed **before** the second sell
+adapter, which is the roadmap's explicit ordering and the reason W5 starts here rather
+than with Depop.
+
+**De-listing is a distributed operation and it will partially fail.** The sale lands on
+eBay, the Vinted pull times out, and a sold item is still buyable. Nothing about that is
+exotic; it is the ordinary behaviour of two systems failing independently. Three things
+follow:
+
+*Intent is recorded before the venue call.* `delist_requested_at` when we decide,
+`delisted_at` only when a venue confirms. A crash between them leaves findable work.
+Call-then-record loses the intent entirely, and the hazard becomes **invisible** rather
+than pending — strictly worse than doing nothing, because the queue looks clean.
+
+*A failed de-list keeps its error and stays queued.* Clearing it would make "actively
+resisting" look identical to "nobody has tried".
+
+*`hazards()` is a query over state, not an event replay.* It is therefore correct after
+a crash, a missed webhook, or a stretch when nothing was running — and those gaps are
+precisely when a double sale happens. Event-driven reconciliation inherits every gap in
+event delivery.
+
+Four hazard kinds, because each needs a different response: `LIVE_AFTER_SALE` (nothing
+in flight, nothing will fix it), `DELIST_FAILED`, `DELIST_PENDING` (benign for minutes,
+a hazard for hours — the caller decides from `requested_at`), and `SOLD_TWICE`, which is
+unpreventable from here and reported so it is not learned from a buyer's message.
+
+### Vinted as a `SellVenue`
+
+**Registration is the first step of publishing, not the last.** A listing live on a
+venue but absent from `own_listings` is invisible to the hazard check — exactly the item
+most likely to be sold twice. Registering first means the worst case is a row for a
+listing that failed to publish, which is harmless and self-correcting.
+
+Per-venue limits belong in the venue adapter: `ListingDraft` caps titles at 80 for
+eBay's limit, Vinted's is 60, so a draft perfectly valid on one venue is still truncated
+for the other.
+
+**Deliberately not built: re-listing to refresh visibility.** Vinted's feed rewards
+recency and the temptation is obvious. `docs/SCOPE.md` excludes reposting to defeat
+duplicate-listing detection, and a convenient framing does not un-exclude it.
+
+### Backtest — P3's mechanism
+
+Refuses below 100 labelled items. A 15% error measured on eleven is not a result; it is
+a number carrying the authority of a measurement. Error is against `est_p25`, the figure
+the buy side actually scores on — backtesting the number you do not trade against would
+be measuring the wrong thing accurately.
+
+Signed error sits beside absolute error because they answer different questions: 12% out
+in both directions is noise, 12% high every time is bias, and bias has a fix. A test
+pins `MIN_LABELLED_ITEMS` and `MAX_MEDIAN_ERROR` so tuning them to pass shows up in a
+diff.

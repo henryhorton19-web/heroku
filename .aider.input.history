@@ -1,0 +1,101 @@
+
+# 2026-08-20 15:11:31.490641
++Y
+
+# 2026-08-20 15:15:46.877753
++/add ROADMAP.md SPEC.md CONTEXT.md
+
+# 2026-08-20 15:38:41.183459
++You are the Lead Engine & Stealth Infrastructure Architect for the Arb Bot project.
++Your objective is to design, plan, and build the High-Throughput Reselling & Arbitrage Engine in Python (blending seamlessly into src/arb/), leveraging the precedents detailed in:
++"C:\Users\HenryHorton\OneDrive - HPE Growth Capital\Documents\Arb_Bot\Comps\ARBITRAGE SYSTEM  PRECEDENT SOURCES & REPOSITORY INDEX.md"
++### Strict Integration Rules with existing heroku codebase:
++1. Seamless Integration into src/arb/:
++   - Place engine modules under src/arb/engine/ (e.g. tls.py, proxy.py, captcha.py, adspower.py, autocop.py, crosslister.py).
++   - Dormant/Opt-In Design: All new engine features must be feature-flagged via Settings (pydantic-settings in src/arb/config.py with ARB_ENGINE_* prefix) and default to disabled so current 550 pytest tests continue to pass with zero breakage.
++   - Quality Gate Adherence: All new code must be ruff clean, formatted, strictly typed (mypy strict with zero raw Any), pass scripts/guard.py, and maintain pytest test coverage >= 85%.
++2. Architectural Invariants to Preserve:
++   - Single Valuation Engine: All pricing must call comps.valuation.value(). Never invent a secondary valuation path.
++   - Pure Scanner: sourcing.scanner.scan() remains pure. High-frequency polling loops wrap scan(), passing listings into it without breaking pure scan behavior.
++   - Integer Pence Money: All prices must use integer pence (parse_pence) via Decimal. Float values for currency are forbidden.
++   - Failing-Closed AutoBuy Rails: AutoCop checkout must interface through src/arb/autobuy.py spend caps, idempotency keys, and P1 fee reconciliation checks before invoking payment endpoints.
++### Core System Pillars & Precedent Sources to Adapt:
++1. Low-Latency Monitoring & TLS Impersonation (Buyside):
++   - Adapt Pawikoski/vinted-api-wrapper, vincenzoAiello/VintedAPI, and herissondev/vinted-api-wrapper for Vinted endpoint shapes.
++   - Implement low-latency HTTP polling using curl_cffi / curl_cffi_interfaces for browser TLS/JA3 impersonation and HTTP/2 header ordering.
++   - Adapt JakobAIOdev/Vintrack-Vinted-Monitor and teddy-vltn/vinted-discord-bot for zero-delay polling workers, search filter schemas, and proxy rotation.
++   - Use changyy/py-proxy-fleet for residential and sticky ISP proxy pool load-balancing, health checks, and automatic failover.
++2. AutoCop Unattended Checkout Engine:
++   - Model request-based payment sequences on adyen-examples/adyen-node-online-payments and adyen-step-by-step-integration-workshop.
++   - Implement payment method discovery (/paymentMethods), address serialization, session initialization, tokenization, and webhook confirmation.
++   - Integrate safety guardrails from src/arb/autobuy.py (idempotency keys, daily spend caps, dead-man switch).
++3. Stealth Headless & Anti-Detect Browser Fleet:
++   - Implement stealth headless browser tasks using berstend/puppeteer-extra-plugin-stealth for WebGL, navigator, and user-agent masking.
++   - Control synthetic buyer profiles via AdsPower/localAPI (CrocoFactory/adspower wrapper), workwhileweb/Multilogin.Api, or Dolphin{anty} API.
++   - Isolate synthetic buyer accounts from main seller accounts across tasks.
++4. CAPTCHA Solving Pipeline:
++   - Create a unified CAPTCHA routing pipeline supporting capsolver-ai/capsolver-core and 2captcha/2captcha-python / 2captcha-ts.
++   - Automate detection and token injection for Cloudflare Turnstile, hCaptcha, and reCAPTCHA v2/v3.
++5. Multi-Channel Cross-Lister & Auto-Delist Sync:
++   - Adapt hendt/ebay-api for official eBay REST inventory & publishing APIs.
++   - Replicate Selenium/Puppeteer automation patterns from lyndskg/posh-a-matic, xzhou13/PoshmarkNursery, and jennyvothreads/acculister for Depop, Poshmark, and Mercari.
++   - Implement auto-reposting logic for stale listings and instantaneous multi-channel de-listing when an item transitions to 'Sold'.
++### Required Output & Action Plan:
++Create a detailed technical plan titled ENGINE_BUILD_PLAN.md breaking down:
++1. Architecture Diagram & Event Bus Flow (Ingestion -> Queue -> AutoCop/Cross-Lister).
++2. Module Structure & Files to create under src/arb/engine/.
++3. Seamless Hook Points into existing heroku CLI (e.g. arb engine monitor, arb engine autocop).
++4. Precedent Repo Code to Harvest (listing specific functions and files from the index).
++5. Step-by-Step Implementation Tasks starting with Phase 1 (Monitoring & TLS/JA3 Stack).
+
+# 2026-08-20 15:38:53.877734
++Y
+
+# 2026-08-20 15:39:01.236335
++D
+
+# 2026-08-20 15:49:44.492670
++Y
+
+# 2026-08-20 15:50:00.966256
++Please proceed with the buildout of Phase 1: Low-Latency Monitoring & TLS/JA3 Stack in an ISOLATED directory.
++
++STRICT ISOLATION RULE:
++- ALL your work MUST be created in a new top-level directory `engine/` and `tests_engine/`.
++- DO NOT edit, modify, or touch any files in `src/arb/` or `tests/`. Those files belong strictly to Claude's application layer.
++- All code, docstrings, comments, and documentation MUST be in ENGLISH.
++
++Phase 1 Action Items (Inside `engine/` and `tests_engine/`):
++
++1. Create Isolated Package Structure:
++   - Create top-level directory `engine/` with `engine/__init__.py`.
++   - Create isolated test directory `tests_engine/`.
++
++2. Implement TLS/JA3 Impersonation Client (`engine/tls.py`):
++   - Create `TlsSession` class wrapping `curl_cffi.requests.Session`.
++   - Support browser impersonation presets (`chrome120`, `firefox122`).
++   - Implement `request(method, url, headers=None, data=None, params=None)` with error handling.
++   - Add unit tests in `tests_engine/test_tls.py` (mocking with `respx`).
++
++3. Implement Proxy Pool Manager (`engine/proxy.py`):
++   - Create `ProxyPool` class loading proxy URLs from file or env var (`ENGINE_PROXY_POOL_PATH`).
++   - Implement `get_proxy()` returning round-robin proxy IPs.
++   - Implement `mark_failed(proxy)` to temporarily quarantine failed IPs.
++   - Add unit tests in `tests_engine/test_proxy.py`.
++
++4. Implement Low-Latency Monitor Worker (`engine/monitor.py`):
++   - Implement `async def poll_vinted(keyword: str, max_price: float | None, tls_session: TlsSession, proxy_pool: ProxyPool)`.
++   - Output structured listing events (`ListingScannedEvent`).
++   - Add unit tests in `tests_engine/test_monitor.py`.
++
++5. Engine Configuration & CLI (`engine/config.py` & `engine/cli.py`):
++   - Create standalone settings in `engine/config.py` using `pydantic-settings` (`ENGINE_ENABLED`, etc.).
++   - Create standalone CLI entrypoint in `engine/cli.py` for running the engine worker.
++
++6. Verification:
++   - Run `uv run ruff check engine/ tests_engine/` and `uv run ruff format --check engine/ tests_engine/`
++   - Run `uv run mypy --strict engine/` (must pass strict mode with 0 raw Any)
++   - Run `uv run pytest tests_engine/`
+
+# 2026-08-20 15:52:10.929524
++Y

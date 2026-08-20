@@ -44,6 +44,7 @@ __all__ = [
     "Listings",
     "MonitorRuns",
     "Opportunities",
+    "OwnListings",
     "PurchaseAttempts",
     "SoldObs",
     "TaxonomyAspects",
@@ -331,6 +332,39 @@ class AutobuyState(Base):
     )
     updated_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
     note: Mapped[str | None] = mapped_column(String)
+
+
+class OwnListings(Base):
+    """Our own listings, one row per (inventory item, venue).
+
+    The table that stops the same jumper being sold twice. Cross-venue de-listing is
+    a distributed operation across systems that fail independently: the sale lands on
+    eBay, the Vinted pull errors, and nothing in a single-row schema records that a
+    live listing is now dangerous.
+
+    So intent is recorded *before* the API call. `delist_requested_at` is set when we
+    decide the listing must come down; `delisted_at` only when a venue confirms. A row
+    with the first and not the second is an open hazard, and `unresolved_delists`
+    exists to find exactly those.
+    """
+
+    __tablename__ = "own_listings"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    inventory_id: Mapped[int] = mapped_column(ForeignKey("inventory.id"), nullable=False)
+    venue: Mapped[str] = mapped_column(String, nullable=False)
+    external_id: Mapped[str] = mapped_column(String, nullable=False)
+    ask_pence: Mapped[int] = mapped_column(Integer, nullable=False)
+    listed_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
+    sold_at: Mapped[datetime | None] = mapped_column(UtcDateTime)
+    delist_requested_at: Mapped[datetime | None] = mapped_column(UtcDateTime)
+    delisted_at: Mapped[datetime | None] = mapped_column(UtcDateTime)
+    delist_error: Mapped[str | None] = mapped_column(String)
+
+    __table_args__ = (
+        UniqueConstraint("venue", "external_id", name="uq_own_venue_external"),
+        Index("idx_own_inventory", "inventory_id"),
+    )
 
 
 class MonitorRuns(Base):

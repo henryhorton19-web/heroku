@@ -51,10 +51,11 @@ class TestProxyPool:
         """After the quarantine period, the proxy should become available again."""
         pool = ProxyPool(
             ["http://proxy1:8080"],
-            quarantine_seconds=0.01,  # very short
+            quarantine_seconds=1,
         )
         pool.mark_failed("http://proxy1:8080")
-        time.sleep(0.02)
+        time.sleep(1.05)
+
         # Should now be available
         assert pool.get_proxy() == "http://proxy1:8080"
 

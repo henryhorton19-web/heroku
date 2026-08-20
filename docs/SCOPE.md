@@ -59,5 +59,3 @@ Not built, under any framing:
 Note the distinction between tool and use: `curl_cffi` is an ordinary HTTP library
 and is fine for polite, rate-limited requests. It is impersonation *for the purpose of
 evading blocks* that is excluded, not the package.
-
-

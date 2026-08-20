@@ -78,8 +78,9 @@ class TlsSession:
     ) -> Response:
         """Execute an HTTP request with the impersonated fingerprint."""
         resp: Response = self._session.request(
-            method=method.upper(),  # type: ignore[arg-type]
+            method=method.upper(),
             url=url,
+
             headers=headers or {},
             data=data,
             params=params or {},

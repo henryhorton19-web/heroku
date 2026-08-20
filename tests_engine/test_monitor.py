@@ -149,10 +149,11 @@ class TestRunMonitorLoop:
             try:
                 await run_monitor_loop(
                     config,
-                    tls_session,  # type: ignore[arg-type]
-                    proxy_pool,  # type: ignore[arg-type]
+                    tls_session,
+                    proxy_pool,
                     on_event=received_events.append,
                 )
+
             except KeyboardInterrupt:
                 pass
 
