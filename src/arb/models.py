@@ -55,8 +55,8 @@ class ConditionBand(StrEnum):
 
     Vinted's own labels are locale-dependent (the public reference tables ship
     French titles) but the numeric status IDs are stable, so `VINTED_STATUS_TO_BAND`
-    keys on IDs. eBay's condition enums are a separate mapping and are deferred to
-    Step 4, where they must be pulled live from the Taxonomy API per category.
+    keys on IDs. eBay's condition enums are a separate mapping, pulled live from the
+    Taxonomy API per category when publishing.
     """
 
     NEW_WITH_TAGS = "new_with_tags"
@@ -100,7 +100,7 @@ class Attributes(_Frozen):
 
     brand_norm: str
     title_norm: str
-    size_norm: str
+    size_norm: str | None = None
     colour_norm: str | None = None
     condition_band: ConditionBand | None = None
     category_id: str | None = None
@@ -136,11 +136,16 @@ class Listing(_Frozen):
 
 
 class SoldObservation(_Frozen):
-    """One completed sale. The atom of valuation."""
+    """One completed sale. The atom of valuation.
+
+    `size_norm` is optional because comp titles frequently omit size, and the
+    `sold_obs` column is nullable to match. Brand and title stay required: they are
+    the blocking key, and an observation without them cannot be matched to anything.
+    """
 
     brand_norm: str
     title_norm: str
-    size_norm: str
+    size_norm: str | None = None
     colour_norm: str | None = None
     condition_band: ConditionBand | None = None
     category_id: str | None = None
@@ -149,6 +154,13 @@ class SoldObservation(_Frozen):
     ship_pence: NonNegPence | None = None
     listed_at: datetime | None = None
     sold_at: datetime | None = None
+    price_is_upper_bound: bool = False
+    """True when the sale price is an upper bound rather than the realised figure.
+
+    Set from SoldComps' `bestOfferAccepted`: eBay never discloses the accepted offer
+    amount, so on a Best Offer sale the reported price is what the item was *listed*
+    at. Valuation excludes these by default -- including them biases every estimate
+    upward, and fashion uses Best Offer heavily."""
 
     @property
     def days_to_sell(self) -> int | None:
@@ -175,6 +187,21 @@ class CompQuery(_Frozen):
     size_norm: str | None = None
     condition_band: ConditionBand | None = None
     category_id: str | None = None
+
+    @property
+    def search_keyword(self) -> str:
+        """The search string to send, without repeating the brand.
+
+        Marketplace titles normally already start with the brand, so naively
+        prefixing `brand_norm` produced queries like "nike nike air max 90".
+        Duplicated tokens dilute eBay's relevance matching, and under an exact-match
+        filter they can drop otherwise-good comps entirely.
+        """
+        title = self.title_norm.strip()
+        brand = self.brand_norm.strip()
+        if brand and not title.startswith(brand):
+            return f"{brand} {title}".strip()
+        return title
 
     @property
     def query_hash(self) -> str:
@@ -229,7 +256,7 @@ class Opportunity(_Frozen):
 
 
 class Decision(_Frozen):
-    """A buy or skip. Written for every judgement, including ones made by hand.
+    """A buy or skip. Written for every judgement, manual or automated.
 
     `skip_reason` is mandatory on a skip. Without it there is no way to later measure
     whether an automated buyer would have done better, and the dry-run comparison

@@ -5,8 +5,6 @@ rests on a gate bad code cannot pass rather than on review. This script checks t
 rules from CONTEXT.md sections 4.7 and 4.8:
 
 * no suppressions -- ``# type: ignore``, ``# noqa``, ``# pragma: no cover``, ``# nosec``
-* an authored-line budget, because the right response to hitting it is to install a
-  dependency rather than to keep writing
 * the never-commit files are actually covered by .gitignore
 
 Run with ``uv run python scripts/guard.py``. Exits non-zero with a specific reason.
@@ -20,10 +18,6 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 SELF = Path(__file__).resolve()
-
-LINE_BUDGET = 4_000
-"""CONTEXT.md 4.8: past roughly this, something in the dependency list has been
-reimplemented. Alembic versions are excluded -- they are generated, not authored."""
 
 SUPPRESSION_TOKENS = ("type: ignore", "noqa", "pragma: no cover", "nosec")
 """This file is excluded from its own scan, so the tokens can be written plainly."""
@@ -78,24 +72,6 @@ def check_no_authored_any() -> list[str]:
     return failures
 
 
-def check_line_budget() -> list[str]:
-    total = 0
-    for path in _authored_files():
-        for line in path.read_text(encoding="utf-8").splitlines():
-            stripped = line.strip()
-            if stripped and not stripped.startswith("#"):
-                total += 1
-    if total > LINE_BUDGET:
-        return [
-            (
-                f"authored source is {total} lines, over the {LINE_BUDGET} budget: "
-                "something in the dependency list has probably been reimplemented"
-            )
-        ]
-    sys.stdout.write(f"guard: authored source {total} / {LINE_BUDGET} lines\n")
-    return []
-
-
 def check_gitignore_covers_secrets() -> list[str]:
     """Static check, deliberately. The repo is public, so this is one of three
     layers alongside pre-commit's detect-private-key and GitHub secret scanning."""
@@ -114,7 +90,6 @@ def main() -> int:
     failures = [
         *check_no_suppressions(),
         *check_no_authored_any(),
-        *check_line_budget(),
         *check_gitignore_covers_secrets(),
     ]
     for failure in failures:

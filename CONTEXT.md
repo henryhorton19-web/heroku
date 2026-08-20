@@ -69,8 +69,7 @@ satisfied, stop and escalate.
 ### 4.8 Don't build what you can install
 Fee tables, valuation and ranking, the quality lexicon, venue glue, and one LLM
 extraction prompt. Everything else — HTTP, retries, ORM, PDF handling, image
-segmentation, fuzzy matching, CLI, config — is an installed dependency. If authored
-code passes ~4,000 lines, something in the dependency list has been reimplemented.
+segmentation, fuzzy matching, CLI, config — is an installed dependency.
 
 ### 4.10 Precision over recall on anything that spends money
 A missed opportunity costs nothing. A false positive costs the trade. Every

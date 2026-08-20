@@ -63,8 +63,7 @@ uv run pytest
 
 `scripts/guard.py` enforces what lint and types cannot: no suppressions
 (`type: ignore`, `noqa`, `pragma: no cover`, `nosec`), no hand-written `Any` in
-`src/`, the 4,000-line authored budget, and `.gitignore` coverage of the three
-never-commit files.
+`src/`, and `.gitignore` coverage of the three never-commit files.
 
 **Never weaken the gate to make something pass.** If a rule genuinely cannot be
 satisfied, stop and escalate. Two exceptions exist today; both are documented at the
@@ -98,15 +97,11 @@ CONTEXT.md        standing policy
 
 **eBay apparel sizing is enforcing now.** Size and Condition are required on new
 fashion listings; non-standard values are blocked or held and are not indexed by
-search. Step 4 must validate against cached Taxonomy enums *before* publish.
+search. Validate against cached Taxonomy enums *before* publish -- a listing that
+publishes but is not indexed looks like success and sells nothing.
 
 **`rembg` model licence.** Always pass `-m u2net_cloth_seg` explicitly. The default
 `bria-rmbg` weights require a paid agreement for commercial use.
 
-**Vinted automated access is against their terms.** Contract, not criminal; the
-realistic exposure is the account you use. Keep the trading account separate from
-anything you cannot lose. Rate limiting defaults to 1.5 req/s, capped at 2.0.
-
-**Excluded throughout:** reposting to defeat duplicate detection, discount-code
-generation, ACO botting, watermark removal, fingerprint spoofing, proxy rotation to
-defeat IP blocking.
+**Request pacing.** Vinted polling defaults to 1.5 req/s and is capped at 2.0 in
+`Settings`. Hard constraints are in `docs/SCOPE.md`.

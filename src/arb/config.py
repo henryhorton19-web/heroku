@@ -40,6 +40,10 @@ class Settings(BaseSettings):
     vinted_requests_per_second: float = Field(default=1.5, gt=0.0, le=2.0)
     vinted_max_retries: int = Field(default=5, ge=0, le=10)
 
+    comps_freshness_days: int = Field(default=7, ge=1, le=90)
+    """How long a cached comps payload stays usable. Seven days trades a little
+    staleness for roughly a 10x reduction in requests against a 100/month tier."""
+
     # Precision over recall: below this comp count we refuse to return an estimate
     # rather than return a confident-looking wrong one.
     min_comp_n: int = Field(default=3, ge=1)

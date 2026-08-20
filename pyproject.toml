@@ -14,6 +14,9 @@ dependencies = [
     "typer>=0.15",
     "httpx>=0.28",
     "tenacity>=9.0",
+    "rapidfuzz>=3.14.5",
+    "pyyaml>=6.0.3",
+    "vinted-api-wrapper>=0.3.9",
 ]
 
 [project.scripts]
@@ -27,6 +30,7 @@ dev = [
     "pytest-cov>=6.0",
     "hypothesis>=6.122",
     "respx>=0.22",
+    "types-pyyaml>=6.0.12.20260815",
 ]
 
 [build-system]
@@ -101,3 +105,10 @@ filterwarnings = ["error"]
 [tool.coverage.run]
 branch = true
 omit = ["src/arb/migrations/*"]
+
+[[tool.mypy.overrides]]
+# vinted-api-wrapper ships no py.typed marker. This silences the missing-stub error
+# for the third-party package only; our own code is still checked strictly, and the
+# wrapper touches exactly one function (arb.sourcing.vinted.build_client).
+module = "vinted.*"
+ignore_missing_imports = true

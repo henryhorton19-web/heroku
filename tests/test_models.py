@@ -277,3 +277,19 @@ def test_listing_draft_enforces_title_limit() -> None:
 
 def test_utcnow_is_aware() -> None:
     assert utcnow().tzinfo is not None
+
+
+def test_search_keyword_does_not_repeat_the_brand() -> None:
+    """Vinted titles normally already start with the brand. Prefixing it produced
+    'nike nike air max 90', and duplicated tokens dilute eBay's relevance matching."""
+    q = CompQuery(brand_norm="nike", title_norm="nike air max 90 white")
+    assert q.search_keyword == "nike air max 90 white"
+
+
+def test_search_keyword_adds_a_missing_brand() -> None:
+    q = CompQuery(brand_norm="barbour", title_norm="bedale wax jacket")
+    assert q.search_keyword == "barbour bedale wax jacket"
+
+
+def test_search_keyword_survives_an_empty_brand() -> None:
+    assert CompQuery(brand_norm="", title_norm="air max 90").search_keyword == "air max 90"

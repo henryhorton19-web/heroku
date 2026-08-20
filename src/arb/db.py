@@ -18,6 +18,7 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING, override
 
 from sqlalchemy import (
+    Boolean,
     Float,
     ForeignKey,
     Index,
@@ -143,6 +144,9 @@ class SoldObs(Base):
     listed_at: Mapped[datetime | None] = mapped_column(UtcDateTime)
     sold_at: Mapped[datetime | None] = mapped_column(UtcDateTime)
     days_to_sell: Mapped[int | None] = mapped_column(Integer)
+    price_is_upper_bound: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="0"
+    )
     source_row: Mapped[int | None] = mapped_column(ForeignKey("comps_cache.id"))
 
     __table_args__ = (Index("idx_block", "brand_norm", "size_norm", "condition_band"),)
@@ -205,7 +209,7 @@ class Opportunities(Base):
 
 
 class Decisions(Base):
-    """Every buy and every skip, including the ones made by hand.
+    """Every buy and every skip, manual or automated.
 
     The application layer requires `skip_reason` on a skip; see `models.Decision`.
     The DB permits null so that a partially-written row is still recoverable rather
@@ -225,7 +229,7 @@ class Decisions(Base):
 
 class Inventory(Base):
     """Owned stock and its realised economics. `actual_fees_pence` comes from the eBay
-    Sell Fulfillment API and is what corrects the fee table after Step 3."""
+    Sell Fulfillment API and is what `arb reconcile` uses to correct the fee table."""
 
     __tablename__ = "inventory"
 

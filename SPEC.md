@@ -1,7 +1,7 @@
 # SPEC — current module contract
 
-**Step 0 complete. Steps 1–4 not started.**
-Updated 19 Aug 2026. This file is the contract; `CONTEXT.md` is the standing policy.
+**M1 buyside at 95%. M2–M5 not started. See ROADMAP.md for sequencing.**
+Updated 20 Aug 2026. This file is the contract; `CONTEXT.md` is the standing policy.
 
 ---
 
@@ -14,15 +14,31 @@ Updated 19 Aug 2026. This file is the contract; `CONTEXT.md` is the standing pol
 | `arb/norm.py` | `norm_text` / `norm_brand` / `norm_size` / `norm_colour`. Blocking keys. | 115 |
 | `arb/db.py` | Tables per Part B.4, plus `vinted_ref`. `UtcDateTime` type decorator. | 212 |
 | `arb/refdata.py` | Loads the Vinted ID tables into `vinted_ref`. | 212 |
-| `arb/cli.py` | `version`, `db upgrade`, `db current`, `load-refdata`, `doctor`. | 96 |
+| `arb/money.py` | Decimal-string → integer pence. No float ever touches a price. | 55 |
+| `arb/comps/fees.py` | Versioned YAML fee tables, content-hashed into `fee_table_version`. | 110 |
+| `arb/comps/valuation.py` | Trimmed p25/p60, confidence, Best Offer exclusion. Returns `None` below the floor. | 75 |
+| `arb/comps/matching.py` | Blocking (hard) + rapidfuzz scoring (soft), reported separately. | 45 |
+| `arb/comps/cache.py` | Append-only comps cache. No delete path exists, by design. | 40 |
+| `arb/comps/soldcomps.py` | SoldComps `CompSource`. Contract verified against their docs. | 145 |
+| `arb/sourcing/quality.py` | Quality lexicon v0, negation- and boundary-aware. | 110 |
+| `arb/sourcing/contest.py` | Contest density over `favourites`/`views`. Pure. Thresholds provisional. | 157 |
+| `arb/sourcing/rank.py` | Capital-velocity ranking + the unknown-velocity policy. | 120 |
+| `arb/sourcing/scanner.py` | `scan()` — **pure function**; monitors and AutoBuy wrap it. | 75 |
+| `arb/sourcing/vinted.py` | `BuyVenue` adapter. Pure mapping split from the network call. | 105 |
+| `arb/comps/service.py` | Cache-first comp acquisition, quota-aware. | 75 |
+| `arb/pipeline.py` | Composes fetch → value → scan. All I/O at the edges. | 70 |
+| `arb/repo.py` | Listing upsert, opportunity write, the single decision write path. | 115 |
+| `arb/cli.py` | `version`, `db`, `load-refdata`, `doctor`, `scan`, `buylist`, `decide`, `provenance`. | 360 |
+| `arb/provenance.py` | The placeholder register, resolved against live state. `gather` I/O, `resolve` pure. | 375 |
 | `arb/config.py` | `Settings` via pydantic-settings, `ARB_` prefix. All credentials optional. | 42 |
 | `arb/store.py` | Engine, `session_scope`, `upgrade_to_head`. | 40 |
 
-**Authored source: 1,009 / 4,000 lines**, enforced by `scripts/guard.py`. The count
+**Authored source: 3,147 lines**, tracked for visibility. The count
 includes docstrings, which are a large share of it — the modules are heavily commented
 because the reasoning behind a threshold is the thing that gets lost, not the threshold.
 
-Gate status: ruff clean, mypy strict clean, 108 tests, 98% coverage.
+Gate status: ruff clean, mypy strict clean, 354 tests, 97% coverage. Full CI gate
+verified locally including migrate-from-empty and `uv lock --check`.
 
 ---
 
@@ -79,7 +95,6 @@ These came from inspecting the actual payloads before writing against them. They
 
 - **No suppressions.** `# type: ignore`, `# noqa`, `# pragma: no cover`, `# nosec` all fail `scripts/guard.py`. Zero present.
 - **No hand-written `Any`** in `src/`. Narrow with `object` and `isinstance`.
-- **Authored-line budget of 4,000.** Hitting it means a dependency has been reimplemented.
 - **`.gitignore` covers `.env`, `ebay_rest.json`, `arb.db`.** Plus `detect-private-key` in pre-commit and GitHub secret scanning — three layers, because the repo is public.
 - **Models and migrations cannot drift.** `test_models_and_migrations_do_not_drift` runs Alembic's `compare_metadata` against the migrated database.
 - **Migrations apply from empty** in CI, so a migration that only works against an existing database fails.
@@ -105,7 +120,7 @@ def value(observations: Sequence[SoldObservation], min_comp_n: int) -> Valuation
 
 ### Definitions to pin before code
 
-`capital_velocity` is deliberately **not** yet implemented, so Step 1 and Step 2 cannot disagree about it. Proposed contract, to be confirmed against real numbers in Step 3:
+`capital_velocity` contract, to be confirmed against realised days-to-sell:
 
 ```
 capital_velocity = net_pence / cost_pence / max(days_to_sell_p50, 1)
@@ -137,3 +152,208 @@ Fail means add Apify as a second comps source. **Do not tune thresholds to pass.
 - **eBay apparel size standardisation is live this month.** Size and Condition are required on new fashion listings; non-standard values are blocked or held. `ListingDraft` carries both fields, but the Taxonomy enum validation is Step 4 and is a hard gate on publish.
 - **Re-verify at build time.** SoldComps' free-tier limit, the eBay size rules, and the `ebay_rest` package's maintenance status all go stale. That verification is Perplexity's job, not Claude's.
 - **Vinted automated access is against their terms.** Contract, not criminal; the realistic exposure is the account. Keep the trading account separate from anything that cannot be lost. Rate limit defaults to 1.5 req/s and is capped at 2.0 in `Settings`.
+
+
+---
+
+## 8. Facts established from the SoldComps contract (20 Aug 2026)
+
+Verified against sold-comps.com/docs. Each one changed a design decision.
+
+**`days_to_sell` cannot be sourced from eBay comps.** The sold response carries
+`endedAt` (a bare date) and **no listing-start field**. Their Poshmark endpoint does
+expose `listedAt`/`daysToSell`; the eBay one does not. Since capital velocity is the
+ranking key for the entire buy side, its denominator is unavailable on day one. The
+three routes are Browse's `itemCreationDate` on active listings, accumulating
+active→sold transitions in the append-only cache, or ranking without it.
+
+**`bestOfferAccepted` makes `soldPrice` an upper bound.** eBay never discloses the
+accepted offer, so those rows carry the *listed* price. `SoldObservation
+.price_is_upper_bound` records it (migration `0002`), and `value()` excludes them by
+default. Outlier trimming catches a lone inflated row, but once Best Offer sales are
+a third of the set — ordinary in fashion — they are the distribution, not outliers.
+Both cases are pinned in tests.
+
+**Three corrections to the build plan.** `count` maxes at **200**, not 240. Prices
+arrive as **decimal strings**. `totalItems` is the count on the current page, not a
+grand total (`totalResults` is eBay's approximate string, e.g. `"14,000+"`).
+
+**A 429 is two different errors.** `code: rate_limited` is transient; `code:
+quota_exceeded` can have a `Retry-After` measured in days. They are separate
+exception types so a retry loop cannot conflate them.
+
+---
+
+## 9. Decisions taken during Step 1–2 implementation
+
+**Valuation scores at `est_p25`, not `est_p60`.** Buying against the optimistic
+figure is how a plausible margin becomes a loss.
+
+**Unknown velocity excludes by default (`VelocityPolicy.EXCLUDE`).** An item whose
+clearing speed is unknown is not ranked. `ScanResult` reports
+`suppressed_unknown_velocity` so an empty buy list is distinguishable from a quiet
+market. `ASSUME_DEFAULT` exists for the early period but every figure it produces
+rests on an unmeasured number.
+
+**Zero-cost listings are counted separately as `suppressed_anomalous_cost`.** A free
+item is a data error or a scam, not an infinite-return opportunity, and folding it
+into the unpriceable count would make the diagnostics lie.
+
+**Fee tables ship `provisional: true` and a test enforces it.** If that test ever
+fails, someone has claimed verification — check they actually did it.
+
+**`SoldObservation.size_norm` and `Attributes.size_norm` are optional.** Comp titles
+routinely omit size and both columns were already nullable; the models were stricter
+than the schema and than reality. Whether a size-less listing is *buyable* is a
+policy question for the quality filter, not a representability question for a model.
+
+---
+
+## 10. What remains
+
+See `ROADMAP.md` for the full plan. Nothing waits on data: every gap runs on a
+declared placeholder tracked in the roadmap's placeholder register.
+
+Immediately open in W1, and both need an external input this codebase cannot
+supply on its own:
+
+* `backtest.py` — needs 100 items with known realised prices. The harness can be
+  written against synthetic labels first, but the number it produces means nothing
+  until the labels are real.
+* live Vinted session auth — needs credentials and a live handshake to verify.
+
+Done this session: `arb provenance` (§13) and the contest-density filter (§13).
+
+W2 (sellside), W3 (books and dashboard), W4 (automation) and W5 (multi-venue) can all
+start in parallel; their code dependencies already exist.
+
+---
+
+## 11. Quota discipline
+
+The free comps tier is 100 requests a month, which is the binding constraint on the
+whole buy side. Two mechanisms protect it, both found by running the pipeline
+end to end rather than by reasoning about it:
+
+**Quality is assessed before comps are fetched.** The first end-to-end run spent a
+request on a listing described as "stained sole" — an item the filter was always
+going to reject. `run_scan` now pre-filters, while `scan` remains the authoritative
+classifier, so the classification is unchanged and only the spend is avoided.
+
+**Cached payloads are reused within and across runs.** `comps_freshness_days`
+(default 7) controls the window. Identical queries inside one scan collapse onto the
+first fetch, so a search returning twenty of the same item costs one request.
+
+`arb scan` reports `comps: N cached, M fetched` every run. Fetch-heavy means the
+freshness window is too short for how you are searching.
+
+A third correction came out of the same run: `CompQuery.search_keyword` no longer
+prefixes the brand when the title already starts with it. Queries were going out as
+`nike nike air max 90`, and duplicated tokens dilute eBay's relevance matching —
+under `exactMatch=true` they can drop otherwise-good comps entirely.
+
+---
+
+## 12. Running the buy loop
+
+```bash
+arb scan "nike air max 90" --max-price 25.00     # fetch, price, rank, persist
+arb buylist                                       # ranked, best capital velocity first
+arb decide <id> --outcome skipped --reason "..."  # refuses without a reason
+arb decide <id> --outcome bought  --spend 12.00   # refuses without a cost basis
+```
+
+Both refusals are deliberate. A skip without a reason gives AutoBuy's dry-run nothing
+to score against, and a purchase without a cost basis makes every downstream margin
+overstated.
+
+Record for every completed sale: predicted net, realised net, actual eBay fees from
+the Sell Fulfillment API, actual postage both ways, and days to sell. Those five
+numbers are what `arb reconcile` uses to rewrite `data/fees/*.yaml` and lift
+`provisional: true`.
+
+---
+
+## 13. Decisions taken building the contest filter and `arb provenance`
+
+### The save rate is the metric, because it is the only age-invariant one
+
+The obvious contest measure is favourites per day, and it is unavailable. Vinted's
+search response carries no listing-creation date, and `first_seen` is when *we* saw
+the listing, not when it was posted — on a first scan `first_seen == now`, so the
+denominator is zero. This is the same missing-denominator shape as `days_to_sell`
+(P2), from a different direction.
+
+The save rate sidesteps it entirely:
+
+```
+save_rate = favourites / views
+```
+
+Both counters accumulate over the same unknown window, so the window cancels. Eight
+saves from twenty views is a hot item whether that took two hours or two days. This
+is why the roadmap named both fields rather than just `favourites`.
+
+Two rules fire: an absolute favourite cap, and the save rate behind a volume floor.
+The floor is load-bearing — without it, one save from one view is a 100% rate and
+every brand-new listing is rejected.
+
+### Contest accepts on ambiguity; quality rejects on it
+
+The asymmetry runs the opposite way from `sourcing/quality.py`, deliberately. An
+ambiguous *description* usually means a flawed item, so quality rejects. An absent
+favourite count means nothing at all about demand, so contest accepts. Rejecting on
+missing counters would systematically drop the newest listings — which are the
+least contested, and therefore exactly the stock worth buying. Same reasoning as
+`vinted_ref` not being a brand allowlist: absence of data is not evidence.
+
+### `ScoreContext` now carries filter policy, not only cost inputs
+
+Adding `contest_policy` as a sixth parameter to `scan()` tripped `PLR0913`. The gate
+was right — the signature had outgrown itself — and the fix is the one the codebase
+already documents: `ScoreContext` exists so that "adding a component later is a
+field, not a signature change at every call site." The policy went there and `scan`
+returned to five parameters. The docstring was widened to say honestly that the type
+now carries two kinds of thing. **No per-file ignore was added.**
+
+### Contest is pre-filtered in `run_scan`, for the same reason quality is
+
+It reads two integers already on the listing, so applying it before comps are fetched
+costs nothing and saves a request against a 100-per-month budget. `scan` re-runs it
+and remains the authoritative classifier; the pre-filter changes the spend, never the
+verdict. Both halves of that are pinned by tests.
+
+### The register resolves to open by default, and `UNKNOWN` is a distinct state
+
+`resolve()` closes a placeholder only on positive evidence. "Nothing to check"
+resolves to `UNKNOWN`, not closed — an empty fee directory technically satisfies "no
+table is provisional" and would otherwise read as green. The load-bearing test is
+`test_an_empty_system_reports_nothing_closed`: a register that flatters the system
+converts a known unknown into an unknown one, which is worse than having no register.
+
+A registered placeholder with no resolver raises rather than being skipped. A gap
+that is declared and then silently never checked is the precise failure this module
+exists to prevent.
+
+### P9 was added to the register by the same change that created it
+
+The contest thresholds are invented. They ship `provisional=True`, carry a
+`contest-v0` version that a retune must bump, and appear in `arb provenance` as P9.
+Closed by realised win rate — of the listings you tried to buy, which were gone
+before checkout.
+
+They are **not stamped** onto any persisted number, unlike `fee_table_version`, and
+the omission is deliberate: a contest verdict influences a boolean rejection, not a
+margin, so there is no historical figure for a wrong threshold to poison. Retuning
+changes what future scans reject and nothing already written.
+
+### `arb provenance` reports, it does not fail
+
+Every placeholder is open early on, so exiting non-zero would make the command
+useless exactly when it is most needed. The one hard ordering rule in ROADMAP §9 —
+do not enable AutoBuy purchase execution while P1 is open — is a one-line check
+against `resolve()` at the call site that needs it, not a flag here.
+
+It also prints which `fee_table_version`s scored the existing book, and warns when
+there is more than one. That is what stamping was for: two versions in one book means
+the margins are not comparable with each other and a re-score is owed.
