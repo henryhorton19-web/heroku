@@ -10,6 +10,14 @@ Operating brief for a coding agent building this to beta. Read this, then
 A personal reselling tool. Buy underpriced clothing on Vinted, sell it on eBay, and
 keep one honest ledger. Python 3.12, SQLite, uv, mypy strict.
 
+**Language Constraint:** All code, docstrings, comments, commit messages, documentation, CLI outputs, and LLM agent responses MUST be written exclusively in **English**. Do not write or generate output in Dutch or any other non-English language.
+
+### Agent Roster & Responsibilities:
+| Codename | Agent / Model | Role & Mandate | Scope & Boundaries |
+|---|---|---|---|
+| **Horse** | Claude | Application Layer & Governance Workhorse | Core business dashboard, inventory lifecycle state machine, fee reconciler, PDF label cropper, UK tax output, single valuation engine (`value()`), CI quality gates. Sandbox isolated (`arb-claude-handoff.zip`). |
+| **Shadow** | DeepSeek / Aider | High-Throughput Engine & Stealth Infrastructure | Sub-millisecond polling (<0.2ms), browser TLS/JA3 impersonation (`curl_cffi`), proxy rotation (`py-proxy-fleet`), CAPTCHA solving (`CapSolver`/`2Captcha`), AdsPower stealth browser profiles, AutoCop checkout. Isolated in `engine/`. |
+
 **Working today** (354 tests, CI green):
 valuation · fee model · comp matching · append-only comps cache · SoldComps adapter ·
 quality filter · contest-density filter · pure scanner · capital-velocity ranking ·

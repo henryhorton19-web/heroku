@@ -13,6 +13,11 @@ server process. Single-user, local, no auth and no multi-tenancy by design.
 
 **Language Requirement:** All code, docstrings, comments, documentation, handoff briefs, CLI outputs, and LLM responses MUST be written exclusively in **English**.
 
+### Agent Roster & Codenames:
+* **Horse** (Claude): Ethical intensive application workhorse (`src/arb/`).
+* **Shadow** (DeepSeek / Aider): Stealth automation & high-throughput engine architect (`engine/`).
+
+
 
 **Status: 596 tests, 88% coverage, full CI gate green. 44 modules, 9 migrations, 22
 CLI commands.** (W1–W5 baseline complete; engine/ infrastructure isolated). Nothing has been traded yet, so every figure the tool produces is
