@@ -1,0 +1,20 @@
+# Action versions are the part of this repo most likely to rot silently. Two live
+# examples caught on 20 Aug 2026: actions/checkout@v4 runs on Node 20, which is
+# removed from GitHub runners on 16 Sep 2026, and astral-sh/setup-uv stopped
+# publishing moving major tags at v8.0.0, so @v5 was five majors behind.
+# Letting Dependabot own this is cheaper than remembering to check.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "ci"
+
+  - package-ecosystem: uv
+    directory: "/"
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "deps"

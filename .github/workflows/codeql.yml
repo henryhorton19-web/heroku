@@ -13,14 +13,16 @@ permissions:
   contents: read
   security-events: write
 
+# codeql-action is the exception to SHA pinning: GitHub explicitly recommends tracking
+# it by major tag so server-side feature flags stay in sync. v3 is deprecated Dec 2026.
 jobs:
   analyse:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - uses: github/codeql-action/init@v3
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: github/codeql-action/init@v4
         with:
           languages: python
           queries: security-extended
-      - uses: github/codeql-action/analyze@v3
+      - uses: github/codeql-action/analyze@v4
