@@ -11,6 +11,9 @@ A personal reselling tool. Buy underpriced clothing on Vinted, sell it on eBay, 
 one honest ledger. Python 3.12, SQLite, uv, mypy strict. CLI only — no web service, no
 server process. Single-user, local, no auth and no multi-tenancy by design.
 
+**Language Requirement:** All code, docstrings, comments, documentation, handoff briefs, CLI outputs, and LLM responses MUST be written exclusively in **English**.
+
+
 **Status: 550 tests, 88% coverage, full CI gate green. 41 modules, 8 migrations, 19
 CLI commands.** Nothing has been traded yet, so every figure the tool produces is
 still downstream of an assumption — see §5.

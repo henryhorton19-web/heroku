@@ -8,6 +8,9 @@
 
 A personal reselling tool aimed at maximising profit.
 
+**Language Standard:** All engineering documentation, code, comments, specs, CLI output, and agent communication MUST be conducted strictly in **English**.
+
+
 ---
 
 ## 2. Phases, and the hard boundary between them

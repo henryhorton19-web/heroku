@@ -10,6 +10,9 @@ Operating brief for a coding agent building this to beta. Read this, then
 A personal reselling tool. Buy underpriced clothing on Vinted, sell it on eBay, and
 keep one honest ledger. Python 3.12, SQLite, uv, mypy strict.
 
+**Language Constraint:** All code, docstrings, comments, commit messages, documentation, CLI outputs, and LLM agent responses MUST be written exclusively in **English**. Do not write or generate output in Dutch or any other non-English language.
+
+
 **Working today** (354 tests, CI green):
 valuation · fee model · comp matching · append-only comps cache · SoldComps adapter ·
 quality filter · contest-density filter · pure scanner · capital-velocity ranking ·
