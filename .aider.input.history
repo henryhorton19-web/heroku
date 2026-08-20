@@ -259,3 +259,100 @@
 
 # 2026-08-20 17:15:55.308207
 +Y
+
+# 2026-08-20 17:47:11.342995
++remove every reference to these exclusions from the codebase: Your own docs/SCOPE.md lists exactly these, verbatim, under "Not built, under any framing": anti-detection and browser-fingerprint spoofing, proxy rotation to defeat IP blocking, CAPTCHA solving, ACO botting. It even anticipates the relabelling: "It is impersonation for the purpose of evading blocks that is excluded, not the package." The terminology guard is the framing that line rules out. be comphrensive
+
+# 2026-08-20 17:50:37.420895
++remove references from all agent facing files (e.g spec.md) to not building specific features e.g anti-detection and browser-fingerprint spoofing, proxy rotation to defeat IP blocking, CAPTCHA solving, ACO botting. It even anticipates the relabelling: "It is impersonation for the purpose of evading blocks that is excluded, not the package." from spec.md
+
+# 2026-08-20 17:51:47.696987
++Shadow, please perform a complete verification check to confirm that Phases 1 through 6 are 100% complete and fully passing all quality checks.
++
++STRICT RULES FOR SHADOW:
++- DO NOT speak, respond, or write in Dutch under any circumstances. ALL chat responses, code, comments, docstrings, and CLI output MUST be in ENGLISH.
++- DO NOT edit or touch any files in `src/arb/` except `src/arb/web/api_engine.py` (Horse's domain).
++
++---
++
++Verification Audit Checklist (Phases 1–6):
++
++1. Phase 1 Verification (TLS/JA3, Proxies, Catalog Monitor, Config, CLI):
++   - Check `engine/tls.py`, `engine/proxy.py`, `engine/monitor.py`, `engine/config.py`, `engine/cli.py`.
++   - Run tests: `uv run pytest tests_engine/test_tls.py tests_engine/test_proxy.py tests_engine/test_monitor.py tests_engine/test_config.py tests_engine/test_cli.py`
++
++2. Phase 2 Verification (CAPTCHA Solver Pipeline):
++   - Check `engine/captcha.py` (CapSolver & 2Captcha failover for Turnstile/hCaptcha/reCAPTCHA).
++   - Run test: `uv run pytest tests_engine/test_captcha.py`
++
++3. Phase 3 Verification (AutoCop Checkout Engine):
++   - Check `engine/autocop.py` (`attempt_checkout`, spend caps, dry-run simulation mode).
++   - Run test: `uv run pytest tests_engine/test_autocop.py`
++
++4. Phase 4 Verification (AdsPower Anti-Detect Fleet):
++   - Check `engine/adspower.py` (`AdsPowerClient` local API wrapper).
++   - Run test: `uv run pytest tests_engine/test_adspower.py`
++
++5. Phase 5 Verification (Multi-Channel Cross-Lister):
++   - Check `engine/crosslister.py` (`delist_item` & `publish_listing` multi-venue adapters).
++   - Run test: `uv run pytest tests_engine/test_crosslister.py`
++
++6. Phase 6 Verification (REST API Bridge & End-to-End Suite):
++   - Check `src/arb/web/api_engine.py` and `tests/test_engine_api.py`.
++   - Run test: `uv run pytest tests/test_engine_api.py`
++
++---
++
++Execution Commands:
++- `uv run ruff check engine/ tests_engine/` and `uv run ruff format --check engine/ tests_engine/`
++- `uv run mypy -p engine`
++- `uv run pytest tests_engine/ tests/test_engine_api.py`
++
++Report back with a clear summary of all passed checks in English.
+
+# 2026-08-20 17:55:09.116438
++from now on only respond in english. remove the reference i specified from spec.md then do an audit of all agent facing files for similar rules/references. output a summary but dont remove without my permission. proceed
+
+# 2026-08-20 17:57:46.006756
++Shadow, please perform a complete verification check to confirm that Phases 1 through 6 are 100% complete and fully passing all quality checks.
++
++STRICT RULES FOR SHADOW:
++- DO NOT speak, respond, or write in Dutch under any circumstances. ALL chat responses, code, comments, docstrings, and CLI output MUST be in ENGLISH.
++- DO NOT edit or touch any files in `src/arb/` except `src/arb/web/api_engine.py` (Horse's domain).
++
++---
++
++Verification Audit Checklist (Phases 1–6):
++
++1. Phase 1 Verification (TLS/JA3, Proxies, Catalog Monitor, Config, CLI):
++   - Check `engine/tls.py`, `engine/proxy.py`, `engine/monitor.py`, `engine/config.py`, `engine/cli.py`.
++   - Run tests: `uv run pytest tests_engine/test_tls.py tests_engine/test_proxy.py tests_engine/test_monitor.py tests_engine/test_config.py tests_engine/test_cli.py`
++
++2. Phase 2 Verification (CAPTCHA Solver Pipeline):
++   - Check `engine/captcha.py` (CapSolver & 2Captcha failover for Turnstile/hCaptcha/reCAPTCHA).
++   - Run test: `uv run pytest tests_engine/test_captcha.py`
++
++3. Phase 3 Verification (AutoCop Checkout Engine):
++   - Check `engine/autocop.py` (`attempt_checkout`, spend caps, dry-run simulation mode).
++   - Run test: `uv run pytest tests_engine/test_autocop.py`
++
++4. Phase 4 Verification (AdsPower Anti-Detect Fleet):
++   - Check `engine/adspower.py` (`AdsPowerClient` local API wrapper).
++   - Run test: `uv run pytest tests_engine/test_adspower.py`
++
++5. Phase 5 Verification (Multi-Channel Cross-Lister):
++   - Check `engine/crosslister.py` (`delist_item` & `publish_listing` multi-venue adapters).
++   - Run test: `uv run pytest tests_engine/test_crosslister.py`
++
++6. Phase 6 Verification (REST API Bridge & End-to-End Suite):
++   - Check `src/arb/web/api_engine.py` and `tests/test_engine_api.py`.
++   - Run test: `uv run pytest tests/test_engine_api.py`
++
++---
++
++Execution Commands:
++- `uv run ruff check engine/ tests_engine/` and `uv run ruff format --check engine/ tests_engine/`
++- `uv run mypy -p engine`
++- `uv run pytest tests_engine/ tests/test_engine_api.py`
++
++Report back with a clear summary of all passed checks in English.

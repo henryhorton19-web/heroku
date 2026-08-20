@@ -12,11 +12,12 @@ from engine.captcha import CaptchaError, CaptchaResult, CaptchaSolver
 class TestCaptchaSolver:
     """Tests for CaptchaSolver."""
 
-    def test_init_no_keys_raises_on_solve(self) -> None:
+    @pytest.mark.asyncio
+    async def test_init_no_keys_raises_on_solve(self) -> None:
         """When no keys are set, solve methods raise CaptchaError."""
         solver = CaptchaSolver()
         with pytest.raises(CaptchaError, match="No CAPTCHA provider configured"):
-            solver.solve_turnstile("sitekey", "https://example.com")
+            await solver.solve_turnstile("sitekey", "https://example.com")
 
     @pytest.mark.asyncio
     async def test_solve_capsolver_success(self) -> None:

@@ -129,6 +129,15 @@ async def attempt_checkout(
             f"Price {price_pence}p exceeds max spend {settings.autocop_max_spend_pence}p."
         )
 
+    if dry_run:
+        return PurchaseAttemptResult(
+            success=True,
+            listing_id=listing_id,
+            price_pence=price_pence,
+            transaction_id=f"dry-run-{listing_id}",
+            error=None,
+        )
+
     proxy = proxy_pool.get_proxy()
 
     # Step 2: fetch available payment methods
