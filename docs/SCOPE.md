@@ -44,20 +44,20 @@ Request pacing defaults to 1.5 req/s and is capped at 2.0 in `Settings`.
 
 ---
 
-## Agent Role Boundaries & Scope Alignment
+## Excluded
 
-This repository strictly separates core application architecture (handled by Claude) from advanced automation, stealth, anti-detection, and multi-venue execution tools (handled by DeepSeek/Aider).
+Not built, under any framing:
 
-### Claude Responsibilities (Core Application Architecture)
-* Core business management dashboard logic, analytics, fee calculations, and SQLite accounting models.
-* Standard marketplace API integrations (eBay official API, Vinted standard read adapter).
-* Clean data normalisation, quality filters, and deterministic CI quality gates.
-* Pure domain models, valuation logic (`value()`), and inventory state tracking (`Scouted` -> `Sniped` -> `In-Transit` -> `Enhanced` -> `Listed` -> `Sold`).
+- Reposting to defeat duplicate-listing detection
+- Discount-code generation
+- ACO botting
+- Watermark removal
+- Anti-detection and browser-fingerprint spoofing
+- Proxy rotation to defeat IP blocking
+- CAPTCHA solving
 
-### DeepSeek / Aider Responsibilities (High-Throughput Automation & Infrastructure)
-* Advanced anti-detection stack (TLS/JA3 spoofing via `curl_cffi` / `tls-client`).
-* Proxy fleet management (residential/ISP rotation per task).
-* Stealth browser automation (AdsPower, Multilogin, nodriver integration).
-* Automated CAPTCHA solving pipeline (CapSolver, 2Captcha APIs).
-* Sub-millisecond scraping, AutoCop unattended execution, and automated reposting / multi-channel cross-listing.
+Note the distinction between tool and use: `curl_cffi` is an ordinary HTTP library
+and is fine for polite, rate-limited requests. It is impersonation *for the purpose of
+evading blocks* that is excluded, not the package.
+
 
