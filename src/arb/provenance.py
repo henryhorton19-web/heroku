@@ -39,6 +39,7 @@ from sqlalchemy import func, select
 
 from arb.db import Decisions, Inventory, Opportunities, SoldObs
 from arb.pipeline import DEFAULT_SCAN_SETTINGS
+from arb.selling.reprice import DEFAULT_REPRICE_POLICY
 from arb.sourcing.contest import DEFAULT_CONTEST_POLICY
 from arb.sourcing.rank import VelocityPolicy
 
@@ -97,7 +98,7 @@ REGISTER: tuple[Placeholder, ...] = (
         id="P2",
         gap="days to sell",
         standing_in="assumed 30 days where the ranking needs a denominator",
-        closed_by="active-to-sold sweep accumulating in the append-only cache",
+        closed_by="`arb sweep`: corroborated active-to-sold transitions",
         blast_radius="ranking order only; NET and CONF are unaffected",
     ),
     Placeholder(
@@ -149,8 +150,15 @@ REGISTER: tuple[Placeholder, ...] = (
         closed_by="realised win rate: which attempted buys were gone before checkout",
         blast_radius="silently skipped good stock, or lost races we entered anyway",
     ),
+    Placeholder(
+        id="P10",
+        gap="repricing decay window",
+        standing_in="assumed 30 days from optimal price to fast-sale price",
+        closed_by="realised days-to-sell against the price the item actually cleared at",
+        blast_radius="capital sits too long, or margin is given away too early",
+    ),
 )
-"""Nine declared gaps. Adding a tenth means adding a resolver -- `resolve` asserts
+"""Ten declared gaps. Adding a tenth means adding a resolver -- `resolve` asserts
 coverage, so a placeholder cannot be registered and then quietly never checked."""
 
 BACKTEST_ITEMS = 100
@@ -190,6 +198,9 @@ class LiveState(NamedTuple):
     stamping was for: after a correction, it tells you how much of the book needs
     re-scoring, and more than one entry means the book is not internally comparable."""
 
+    reprice_provisional: bool = True
+    reprice_version: str = "reprice-v0"
+
 
 class PlaceholderState(NamedTuple):
     placeholder: Placeholder
@@ -211,10 +222,21 @@ def _resolve_fees(state: LiveState) -> tuple[PlaceholderStatus, str]:
     return PlaceholderStatus.CLOSED, f"all {total} tables verified against settlement data"
 
 
+MIN_DURATIONS = 30
+"""Corroborated durations before P2 is worth closing. Below this the median is one
+slow listing away from moving, and the whole point of the sweep is that the number it
+produces is trustworthy enough to rank on."""
+
+
 def _resolve_velocity(state: LiveState) -> tuple[PlaceholderStatus, str]:
     policy = state.velocity_policy.value
     observed = state.sold_obs_with_days
     detail = f"{observed} of {state.sold_obs_total} sold observations carry days_to_sell"
+    if 0 < observed < MIN_DURATIONS:
+        return (
+            PlaceholderStatus.OPEN,
+            f"{detail}; {observed} of {MIN_DURATIONS} needed before the median is stable",
+        )
     if observed == 0:
         return PlaceholderStatus.OPEN, f"{detail}; policy={policy}"
     if state.velocity_policy is VelocityPolicy.ASSUME_DEFAULT:
@@ -256,6 +278,13 @@ def _resolve_autobuy(state: LiveState) -> tuple[PlaceholderStatus, str]:
     return _counted(state.real_decisions, AUTOBUY_DECISIONS, "real decisions recorded")
 
 
+def _resolve_reprice(state: LiveState) -> tuple[PlaceholderStatus, str]:
+    version = state.reprice_version
+    if state.reprice_provisional:
+        return PlaceholderStatus.OPEN, f"{version} decay window is an unmeasured guess"
+    return PlaceholderStatus.CLOSED, f"{version} fitted to realised days-to-sell"
+
+
 def _resolve_contest(state: LiveState) -> tuple[PlaceholderStatus, str]:
     version = state.contest_version
     if state.contest_provisional:
@@ -273,6 +302,7 @@ _RESOLVERS: dict[str, Callable[[LiveState], tuple[PlaceholderStatus, str]]] = {
     "P7": _resolve_ledger,
     "P8": _resolve_autobuy,
     "P9": _resolve_contest,
+    "P10": _resolve_reprice,
 }
 
 
@@ -371,5 +401,7 @@ def gather(session: Session, fee_dir: Path) -> LiveState:
         ship_out_pence=DEFAULT_SCAN_SETTINGS.ship_out_pence,
         contest_provisional=DEFAULT_CONTEST_POLICY.provisional,
         contest_version=DEFAULT_CONTEST_POLICY.version,
+        reprice_provisional=DEFAULT_REPRICE_POLICY.provisional,
+        reprice_version=DEFAULT_REPRICE_POLICY.version,
         fee_versions_in_use=tuple((str(version), int(count)) for version, count in versions),
     )

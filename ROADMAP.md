@@ -22,7 +22,7 @@ call that decides a jumper is worth £42 on the buy side is the same call that p
 your listing and later reprices it. Any change giving the sell side its own pricing
 logic breaks the design.
 
-**Current: W1 at 95%.** 3,147 authored lines, 354 tests, CI green. The two
+**Current: W1 at 95%.** 354 tests, CI green. The two
 remaining W1 tasks each need an external input — credentials, and labelled prices —
 so neither is blocked on code.
 
@@ -57,6 +57,7 @@ rather than discovering that six weeks of margins were fiction.
 | P7 | Ledger / dashboard | synthetic seed | real completed sales | nothing — display only |
 | P8 | AutoBuy eval set | synthetic decisions | accumulated `decisions` rows | dry-run means nothing until real |
 | P9 | Contest thresholds | invented cap + save rate | realised win rate on attempted buys | skipped good stock, or lost races |
+| P10 | Repricing decay | assumed 30d optimal→fast | realised days-to-sell vs clearing price | capital sits, or margin given away |
 
 **`arb provenance` — done.** Prints the register against live state: which fee tables
 are still provisional, how many realised sales and real decisions exist, which velocity
@@ -119,11 +120,11 @@ Owned item to published listing in under three minutes.
 |---|---|
 | LLM listing copy + hashtags, structured output | 1d |
 | `rembg` sidecar, model `u2net_cloth_seg` passed explicitly | 0.5d |
-| **Taxonomy compliance gate** — cache aspect enums, validate before publish | 1.5d |
+| **Taxonomy compliance gate** — cache aspect enums, validate before publish | done |
 | Publish via `ebay_rest` Sell Inventory | 1.5d |
-| Repricing + offer ladders, driven by the same `value()` | 1d |
-| Sell Fulfillment client — settlement data, unblocks **P1** | 1d |
-| Labels: `pdfplumber` carrier detect → bbox crop → 6×4 → `pypdf` merge | 1.5d |
+| Repricing + offer ladders, driven by the same `value()` | done |
+| Settlement client — **`sell_finances`**, not Fulfillment; unblocks **P1** | done |
+| Labels: `pdfplumber` carrier detect → bbox crop → 6×4 → `pypdf` merge | done |
 
 **The taxonomy gate is a hard blocker, not a nicety.** Since August 2026 Size and
 Condition are required on new eBay fashion listings; non-standard values are blocked
@@ -149,13 +150,13 @@ no code change.
 
 | Task | Effort |
 |---|---|
-| Inventory lifecycle as an explicit column | 0.5d |
+| Inventory lifecycle as an explicit column | done |
 | Synthetic seed generator — realistic trades for dashboard development | 0.5d |
-| Ledger: cost basis, real fees, realised net | 1.5d |
-| Capital deployed vs recycled, ageing over 60 days | 1d |
-| `arb reconcile` — predicted vs realised, rewrites fee YAML, closes **P1** | 1d |
+| Ledger: cost basis, real fees, realised net | done |
+| Capital deployed vs recycled, ageing over 60 days | done |
+| `arb reconcile-fees` — predicted vs realised, rewrites fee YAML, closes **P1** | done |
 | Dashboard: margins, profit, run rate, verticals, tasks, outstanding | 2d |
-| HMRC: £1,000 trading allowance flag, SA103 mapping | 1d |
+| HMRC: £1,000 trading allowance flag | done (SA103 box mapping deliberately not) |
 
 **Lifecycle states — adopt Stockly's:** `Scouted → Sniped → In-Transit → Enhanced →
 Listed → Sold`. Your `inventory` table implies these through timestamps, but implied
@@ -182,7 +183,7 @@ if so take Stockly's *component layout and analytics views*, not its persistence
 |---|---|
 | Scheduler + seen-set diff around `scan()` | 2d |
 | Notifications via `apprise` | 0.5d |
-| Active-listing sweep → real `days_to_sell`, closes **P2** | 2d |
+| Active-listing sweep → real `days_to_sell`, closes **P2** | done (needs 30 durations) |
 | AutoBuy rails: spend caps, idempotency keys, dead-man switch | 3d |
 | AutoBuy dry-run harness, runs on synthetic decisions (**P8**) | 1.5d |
 | AutoBuy purchase execution | 2d |

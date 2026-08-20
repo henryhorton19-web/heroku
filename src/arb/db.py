@@ -43,6 +43,7 @@ __all__ = [
     "Listings",
     "Opportunities",
     "SoldObs",
+    "TaxonomyAspects",
     "UtcDateTime",
     "VintedRef",
 ]
@@ -132,6 +133,11 @@ class SoldObs(Base):
     __tablename__ = "sold_obs"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    external_id: Mapped[str | None] = mapped_column(String)
+    """The venue's item id. Present so a disappeared active listing can be
+    corroborated against a completed sale: a listing vanishing from search means it
+    sold *or* was ended unsold, and only this join can tell them apart."""
+
     brand_norm: Mapped[str | None] = mapped_column(String)
     title_norm: Mapped[str | None] = mapped_column(String)
     size_norm: Mapped[str | None] = mapped_column(String)
@@ -149,7 +155,10 @@ class SoldObs(Base):
     )
     source_row: Mapped[int | None] = mapped_column(ForeignKey("comps_cache.id"))
 
-    __table_args__ = (Index("idx_block", "brand_norm", "size_norm", "condition_band"),)
+    __table_args__ = (
+        Index("idx_block", "brand_norm", "size_norm", "condition_band"),
+        Index("idx_sold_external", "external_id"),
+    )
 
 
 class Listings(Base):
@@ -172,6 +181,14 @@ class Listings(Base):
     category_id: Mapped[str | None] = mapped_column(String)
     country: Mapped[str | None] = mapped_column(String)
     seller_id: Mapped[str | None] = mapped_column(String)
+    venue_created_at: Mapped[datetime | None] = mapped_column(UtcDateTime)
+    """When the *venue* says the listing was created, not when we first saw it.
+
+    eBay Browse exposes this as `itemCreationDate`; Vinted's search response does
+    not. It is the only honest start point for a time-on-market measurement --
+    `first_seen` is when our scanner happened to look, which for a listing that
+    existed before we started scanning is arbitrarily late."""
+
     favourites: Mapped[int | None] = mapped_column(Integer)
     views: Mapped[int | None] = mapped_column(Integer)
     first_seen: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
@@ -235,6 +252,14 @@ class Inventory(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     decision_id: Mapped[int | None] = mapped_column(ForeignKey("decisions.id"))
+    state: Mapped[str] = mapped_column(
+        String, nullable=False, default="scouted", server_default="scouted"
+    )
+    """Lifecycle state. The timestamps below already imply it, but an implied state
+    cannot be queried, counted or aged. As a column, "what is stuck in transit" is
+    `WHERE state = 'in_transit' AND acquired_at < ...` rather than a join over three
+    nullable dates."""
+
     cost_pence: Mapped[int] = mapped_column(Integer, nullable=False)
     qty: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
     acquired_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
@@ -245,6 +270,37 @@ class Inventory(Base):
     actual_ship_pence: Mapped[int | None] = mapped_column(Integer)
     realised_net_pence: Mapped[int | None] = mapped_column(Integer)
     sa103_category: Mapped[str | None] = mapped_column(String)
+
+    __table_args__ = (Index("idx_inventory_state", "state", "acquired_at"),)
+
+
+class TaxonomyAspects(Base):
+    """Cached eBay Taxonomy aspect enums, one row per category.
+
+    Raw payload stored and parsed on read, mirroring `comps_cache`: a parser fix
+    then costs nothing, where storing the parsed form would need a refetch of every
+    category. Unlike `comps_cache` this one *is* refreshable -- eBay's enums are
+    public and re-fetchable at any time -- so it carries a unique key per category
+    and is upserted rather than appended.
+
+    `category_tree_version` is stored because eBay bumps it when enums change; a
+    listing validated under an old version is a listing validated against rules that
+    no longer apply.
+    """
+
+    __tablename__ = "taxonomy_aspects"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    marketplace_id: Mapped[str] = mapped_column(String, nullable=False)
+    category_id: Mapped[str] = mapped_column(String, nullable=False)
+    category_tree_id: Mapped[str | None] = mapped_column(String)
+    category_tree_version: Mapped[str | None] = mapped_column(String)
+    payload: Mapped[str] = mapped_column(String, nullable=False)
+    fetched_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("marketplace_id", "category_id", name="uq_taxonomy_marketplace_category"),
+    )
 
 
 class VintedRef(Base):

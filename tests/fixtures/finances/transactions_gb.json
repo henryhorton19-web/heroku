@@ -1,0 +1,76 @@
+{
+  "href": "/sell/finances/v1/transaction?limit=50&offset=0",
+  "limit": 50, "offset": 0, "total": 4,
+  "transactions": [
+    {
+      "transactionId": "T-1001", "orderId": "12-11111-11111",
+      "transactionType": "SALE", "transactionStatus": "FUNDS_PROCESSING",
+      "transactionDate": "2026-08-02T10:15:00.000Z",
+      "bookingEntry": "CREDIT",
+      "amount": { "value": "42.00", "currency": "GBP" },
+      "totalFeeAmount": { "value": "5.75", "currency": "GBP" },
+      "totalFeeBasisAmount": { "value": "44.00", "currency": "GBP" },
+      "orderLineItems": [{
+        "lineItemId": "L-1001",
+        "feeBasisAmount": { "value": "44.00", "currency": "GBP" },
+        "marketplaceFees": [
+          { "feeType": "FINAL_VALUE_FEE", "amount": { "value": "5.28", "currency": "GBP" } },
+          { "feeType": "REGULATORY_OPERATING_FEE", "amount": { "value": "0.17", "currency": "GBP" } },
+          { "feeType": "FINAL_VALUE_FEE_FIXED_PER_ORDER", "amount": { "value": "0.30", "currency": "GBP" } }
+        ]
+      }]
+    },
+    {
+      "transactionId": "T-1002", "orderId": "12-22222-22222",
+      "transactionType": "SALE", "transactionStatus": "FUNDS_AVAILABLE_FOR_PAYOUT",
+      "transactionDate": "2026-08-05T09:00:00.000Z",
+      "bookingEntry": "CREDIT",
+      "amount": { "value": "18.00", "currency": "GBP" },
+      "totalFeeAmount": { "value": "2.87", "currency": "GBP" },
+      "totalFeeBasisAmount": { "value": "21.20", "currency": "GBP" },
+      "orderLineItems": [{
+        "lineItemId": "L-1002",
+        "feeBasisAmount": { "value": "21.20", "currency": "GBP" },
+        "marketplaceFees": [
+          { "feeType": "FINAL_VALUE_FEE", "amount": { "value": "2.54", "currency": "GBP" } },
+          { "feeType": "REGULATORY_OPERATING_FEE", "amount": { "value": "0.08", "currency": "GBP" } },
+          { "feeType": "FINAL_VALUE_FEE_FIXED_PER_ORDER", "amount": { "value": "0.30", "currency": "GBP" } },
+          { "feeType": "AD_FEE", "amount": { "value": "1.06", "currency": "GBP" }, "feeMemo": "Promoted Listings" }
+        ]
+      }]
+    },
+    {
+      "transactionId": "T-1003", "orderId": "12-33333-33333",
+      "transactionType": "SALE", "transactionStatus": "FUNDS_PROCESSING",
+      "transactionDate": "2026-08-08T14:30:00.000Z",
+      "bookingEntry": "CREDIT",
+      "amount": { "value": "75.00", "currency": "GBP" },
+      "totalFeeAmount": { "value": "9.72", "currency": "GBP" },
+      "totalFeeBasisAmount": { "value": "78.50", "currency": "GBP" },
+      "orderLineItems": [{
+        "lineItemId": "L-1003",
+        "feeBasisAmount": { "value": "78.50", "currency": "GBP" },
+        "marketplaceFees": [
+          { "feeType": "FINAL_VALUE_FEE", "amount": { "value": "9.42", "currency": "GBP" } },
+          { "feeType": "REGULATORY_OPERATING_FEE", "amount": { "value": "0.27", "currency": "GBP" } },
+          { "feeType": "FINAL_VALUE_FEE_FIXED_PER_ORDER", "amount": { "value": "0.30", "currency": "GBP" } }
+        ]
+      }]
+    },
+    {
+      "transactionId": "T-1004", "orderId": "12-44444-44444",
+      "transactionType": "REFUND", "transactionStatus": "COMPLETED",
+      "transactionDate": "2026-08-09T11:00:00.000Z",
+      "bookingEntry": "DEBIT",
+      "amount": { "value": "22.00", "currency": "GBP" },
+      "totalFeeAmount": { "value": "0.30", "currency": "GBP" },
+      "orderLineItems": [{
+        "lineItemId": "L-1004",
+        "feeBasisAmount": { "value": "22.00", "currency": "GBP" },
+        "marketplaceFees": [
+          { "feeType": "FINAL_VALUE_FEE_FIXED_PER_ORDER", "amount": { "value": "0.30", "currency": "GBP" } }
+        ]
+      }]
+    }
+  ]
+}

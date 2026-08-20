@@ -2,9 +2,10 @@
 
 Most code here is agent-written and will not be reviewed line by line, so quality
 rests on a gate bad code cannot pass rather than on review. This script checks the
-rules from CONTEXT.md sections 4.7 and 4.8:
+rules from CONTEXT.md section 4.7:
 
 * no suppressions -- ``# type: ignore``, ``# noqa``, ``# pragma: no cover``, ``# nosec``
+* no hand-written ``Any`` in authored source
 * the never-commit files are actually covered by .gitignore
 
 Run with ``uv run python scripts/guard.py``. Exits non-zero with a specific reason.

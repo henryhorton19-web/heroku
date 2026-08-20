@@ -6,6 +6,7 @@ Commands are invoked directly; the scheduler that drives them unattended wraps
 
 from __future__ import annotations
 
+import json
 from collections import Counter
 from datetime import timedelta
 from pathlib import Path
@@ -18,17 +19,34 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 from arb import __version__
+from arb.books.ledger import AGEING_DAYS, capital_position, ledger, totals
+from arb.books.reconcile import MIN_SETTLEMENTS, corrected_yaml, reconcile
+from arb.books.tax import TRADING_ALLOWANCE_PENCE, TaxYear, summarise_tax_year, tax_year_of
 from arb.comps.fees import load_fee_table
 from arb.comps.service import CompsResult, CompsService
 from arb.comps.soldcomps import SoldCompsClient
 from arb.config import Settings, get_settings
 from arb.db import VintedRef
-from arb.models import Decision, DecisionMode, DecisionOutcome, ListingFilter, utcnow
-from arb.money import parse_pence
+from arb.models import (
+    ConditionBand,
+    Decision,
+    DecisionMode,
+    DecisionOutcome,
+    ListingDraft,
+    ListingFilter,
+    Valuation,
+    utcnow,
+)
+from arb.money import parse_pence, pence_to_decimal
 from arb.pipeline import ScanDeps, ScanSettings, run_scan
 from arb.provenance import PlaceholderStatus, gather, resolve
 from arb.refdata import load_reference_data
 from arb.repo import record_decision, top_opportunities, upsert_listing, write_opportunity
+from arb.selling.aspects_repo import cached_aspects, cached_categories, store_aspects
+from arb.selling.finances import parse_transactions
+from arb.selling.labels import merge_labels
+from arb.selling.reprice import RepriceContext, offer_ladder, reprice
+from arb.selling.taxonomy import validate_draft
 from arb.sourcing.vinted import VintedBuyVenue, build_client
 from arb.store import alembic_config, make_engine, session_scope, upgrade_to_head
 
@@ -358,3 +376,451 @@ def _report_fee_versions(versions: tuple[tuple[str, int], ...]) -> None:
             "comparable until you re-score",
             err=True,
         )
+
+
+taxonomy_app = typer.Typer(no_args_is_help=True, help="eBay taxonomy compliance.")
+app.add_typer(taxonomy_app, name="taxonomy")
+
+
+@taxonomy_app.command("load")
+def taxonomy_load(
+    category_id: Annotated[str, typer.Argument(help="eBay leaf category id.")],
+    payload: Annotated[Path, typer.Option(help="getItemAspectsForCategory JSON.")],
+) -> None:
+    """Cache one category's aspect enums from a Taxonomy response.
+
+    Takes a file rather than fetching, because the fetch needs eBay credentials and
+    the gate does not. Caching from a saved response keeps the compliance check
+    usable before the Sell Inventory client exists, and keeps tests off the network.
+    """
+    if not payload.is_file():
+        typer.echo(f"no such file: {payload}", err=True)
+        raise typer.Exit(code=2)
+    parsed = json.loads(payload.read_text(encoding="utf-8"))
+
+    settings = get_settings()
+    marketplace = settings.ebay_marketplace_id
+    engine = make_engine(settings.db_url)
+    with session_scope(engine) as session:
+        store_aspects(
+            session,
+            parsed,
+            marketplace_id=marketplace,
+            category_id=category_id,
+            fetched_at=utcnow(),
+        )
+        loaded = cached_aspects(session, marketplace_id=marketplace, category_id=category_id)
+
+    if loaded is None:
+        typer.echo(f"stored, but category {category_id} is not in that payload", err=True)
+        raise typer.Exit(code=1)
+    required = [a.name for a in loaded.aspects if a.required]
+    typer.echo(f"cached {category_id} ({marketplace}): {len(loaded.aspects)} aspects")
+    typer.echo(f"required: {', '.join(sorted(required)) or 'none'}")
+
+
+@taxonomy_app.command("list")
+def taxonomy_list() -> None:
+    """Show which categories have cached enums, and under which tree version."""
+    settings = get_settings()
+    marketplace = settings.ebay_marketplace_id
+    engine = make_engine(settings.db_url)
+    with session_scope(engine) as session:
+        rows = cached_categories(session, marketplace_id=marketplace)
+
+    if not rows:
+        typer.echo("no cached categories -- run `arb taxonomy load`")
+        return
+    for category_id, version in rows:
+        typer.echo(f"{category_id:<12} tree version {version or '?'}")
+
+
+@taxonomy_app.command("check")
+def taxonomy_check(
+    category_id: Annotated[str, typer.Argument(help="eBay leaf category id.")],
+    size: Annotated[str, typer.Option(help="Size as it would be listed.")],
+    brand: Annotated[str, typer.Option(help="Brand as it would be listed.")],
+    condition: Annotated[ConditionBand | None, typer.Option(help="Condition band.")] = None,
+    aspect: Annotated[
+        list[str] | None, typer.Option(help="Extra specific, as Name=Value. Repeatable.")
+    ] = None,
+) -> None:
+    """Check a draft against the cached enums before publishing it.
+
+    Exits non-zero when the listing would be blocked, held, or accepted without
+    being indexed. That third outcome is why this is a gate and not a warning: an
+    unindexed listing looks exactly like a live one and sells nothing.
+    """
+    settings = get_settings()
+    marketplace = settings.ebay_marketplace_id
+    engine = make_engine(settings.db_url)
+    with session_scope(engine) as session:
+        aspects = cached_aspects(session, marketplace_id=marketplace, category_id=category_id)
+
+    if aspects is None:
+        typer.echo(
+            f"refused: no cached enums for {category_id} ({marketplace}). "
+            "Validating against another category would pass a listing eBay then holds.",
+            err=True,
+        )
+        raise typer.Exit(code=2)
+
+    try:
+        draft = ListingDraft(
+            title="draft",
+            description="draft",
+            category_id=category_id,
+            price_pence=0,
+            size=size,
+            condition_band=condition,
+            brand=brand,
+            aspects=_parse_aspect_options(aspect or []),
+        )
+    except ValidationError as exc:
+        typer.echo(f"refused: {_first_error(exc)}", err=True)
+        raise typer.Exit(code=2) from None
+
+    verdict = validate_draft(draft, aspects)
+    for warning in verdict.warnings:
+        typer.echo(f"soon:  {warning}")
+    if verdict.publishable:
+        typer.echo("publishable")
+        return
+    for violation in verdict.violations:
+        allowed = ", ".join(violation.allowed[:8]) if violation.allowed else "-"
+        got = violation.got or "(missing)"
+        typer.echo(f"BLOCK  {violation.aspect:<14} {violation.kind.value:<16} {got}")
+        typer.echo(f"       allowed: {allowed}")
+    typer.echo(f"refused: {verdict.blocking_reason}", err=True)
+    raise typer.Exit(code=1)
+
+
+def _parse_aspect_options(pairs: list[str]) -> tuple[tuple[str, str], ...]:
+    parsed: list[tuple[str, str]] = []
+    for pair in pairs:
+        name, _, value = pair.partition("=")
+        if not name.strip() or not value.strip():
+            msg = f"expected Name=Value, got {pair!r}"
+            raise typer.BadParameter(msg)
+        parsed.append((name.strip(), value.strip()))
+    return tuple(parsed)
+
+
+@app.command()
+def reconcile_fees(
+    transactions: Annotated[Path, typer.Option(help="getTransactions JSON from sell_finances.")],
+    fee_table: Annotated[str, typer.Option(help="Fee table name under data/fees.")] = "ebay_uk",
+    *,
+    write: Annotated[bool, typer.Option("--write", help="Overwrite the fee table.")] = False,
+) -> None:
+    """Compare predicted fees against what eBay actually charged, and correct the table.
+
+    This is what closes P1. Every margin this tool has ever produced was computed
+    from invented rates; these are the measured ones.
+
+    Refuses below the settlement floor. A correction fitted to three sales is a guess
+    that has learned to look like a measurement, which is worse than the honest guess
+    it would replace.
+
+    `--write` changes the file, which changes its content hash, which changes
+    `fee_table_version`. Every opportunity scored under the old version then needs
+    re-scoring before its margin is comparable -- `arb provenance` will show both
+    versions sitting in the book until you do.
+    """
+    if not transactions.is_file():
+        typer.echo(f"no such file: {transactions}", err=True)
+        raise typer.Exit(code=2)
+    table_path = FEE_TABLE_DIR / f"{fee_table}.yaml"
+    if not table_path.is_file():
+        typer.echo(f"no fee table at {table_path}", err=True)
+        raise typer.Exit(code=2)
+
+    table = load_fee_table(table_path)
+    settlements = parse_transactions(json.loads(transactions.read_text(encoding="utf-8")))
+    result = reconcile(settlements, table)
+
+    if result is None:
+        sales = sum(1 for s in settlements if s.is_sale)
+        typer.echo(
+            f"refused: {sales} settled sales is too few to fit a fee table. "
+            f"Need {MIN_SETTLEMENTS}. Keep trading; the data accumulates.",
+            err=True,
+        )
+        raise typer.Exit(code=1)
+
+    typer.echo(
+        f"settlements  {result.settlements_used} sales, {result.refunds_excluded} refunds excluded"
+    )
+    typer.echo(f"{'COMPONENT':<28} {'ASSUMED':>10} {'MEASURED':>10}  DRIFT")
+    for fit in result.fits:
+        flag = "  <-- material" if fit.materially_different else ""
+        typer.echo(
+            f"{fit.name:<28} {fit.assumed!s:>10} {fit.measured!s:>10}  "
+            f"{fit.drift!s:>9} (n={fit.observations}){flag}"
+        )
+
+    predicted = pence_to_decimal(result.predicted_total_pence)
+    realised = pence_to_decimal(result.realised_total_pence)
+    typer.echo("")
+    typer.echo(f"predicted fees  {predicted}")
+    typer.echo(f"realised fees   {realised}")
+    typer.echo(f"drift           {pence_to_decimal(result.total_drift_pence)}")
+
+    for fee_type, count in result.unmodelled:
+        typer.echo(
+            f"UNMODELLED: {fee_type} on {count} settlements -- not in the fee table, "
+            "so every margin is overstated by this amount",
+            err=True,
+        )
+
+    if not write:
+        if result.needs_rewrite:
+            typer.echo("")
+            typer.echo("re-run with --write to correct the table and lift `provisional`")
+        return
+
+    table_path.write_text(
+        corrected_yaml(table, result, verified_at=utcnow().date().isoformat()), encoding="utf-8"
+    )
+    rewritten = load_fee_table(table_path)
+    typer.echo("")
+    typer.echo(f"wrote {table_path}")
+    typer.echo(f"fee_table_version {table.version} -> {rewritten.version}")
+    typer.echo("re-score opportunities carrying the old version before comparing margins")
+
+
+@app.command("reprice")
+def reprice_listing(
+    listed_price: Annotated[str, typer.Option(help="Current ask, in pounds e.g. 40.00")],
+    cost: Annotated[str, typer.Option(help="What you paid, in pounds e.g. 12.00")],
+    p25: Annotated[str, typer.Option(help="est_p25 from `value()`, in pounds.")],
+    p60: Annotated[str, typer.Option(help="est_p60 from `value()`, in pounds.")],
+    days: Annotated[float, typer.Option(help="Days the item has been listed.")] = 0.0,
+) -> None:
+    """Suggest a new ask and the Best Offer band for a listing that has not sold.
+
+    Takes the valuation percentiles rather than recomputing them, because there is
+    one valuation engine and this is not it. The two numbers come from `value()` --
+    the same call that priced the buy decision.
+
+    Percentiles are passed on the command line for now: reading them from stored
+    inventory needs `listed_at` populated, which is the W3 lifecycle work.
+    """
+    current = parse_pence(listed_price)
+    cost_pence = parse_pence(cost)
+    p25_pence = parse_pence(p25)
+    p60_pence = parse_pence(p60)
+    if current is None or cost_pence is None or p25_pence is None or p60_pence is None:
+        typer.echo("refused: prices must be decimal amounts in pounds", err=True)
+        raise typer.Exit(code=2)
+
+    settings = get_settings()
+    table_path = FEE_TABLE_DIR / f"{settings.ebay_marketplace_id.lower()}.yaml"
+    if not table_path.is_file():
+        table_path = FEE_TABLE_DIR / "ebay_uk.yaml"
+    fees = load_fee_table(table_path)
+
+    try:
+        valuation = Valuation(
+            est_p25_pence=p25_pence,
+            est_p60_pence=p60_pence,
+            comp_n=0,
+            est_confidence=0.0,
+            match_confidence=0.0,
+        )
+    except ValidationError as exc:
+        typer.echo(f"refused: {_first_error(exc)}", err=True)
+        raise typer.Exit(code=2) from None
+
+    ctx = RepriceContext(fee_model=fees, cost_pence=cost_pence)
+    decision = reprice(valuation, ctx, current_pence=current, days_listed=days)
+    ladder = offer_ladder(valuation, ctx, ask_pence=decision.suggested_pence)
+
+    typer.echo(f"listed {days:.0f} days at {pence_to_decimal(decision.current_pence)}")
+    typer.echo(f"suggest      {pence_to_decimal(decision.suggested_pence)}  ({decision.reason})")
+    typer.echo(
+        f"band         {pence_to_decimal(decision.floor_pence)} .. "
+        f"{pence_to_decimal(valuation.est_p60_pence)}"
+    )
+    typer.echo(f"break even   {pence_to_decimal(decision.break_even_pence)}")
+    if ladder.auto_accept_pence is None:
+        typer.echo("offers       no auto-accept: cannot be sold at a profit at this ask")
+    else:
+        typer.echo(
+            f"offers       accept >= {pence_to_decimal(ladder.auto_accept_pence)}, "
+            f"decline < {pence_to_decimal(ladder.auto_decline_pence)}"
+        )
+    if decision.below_break_even:
+        typer.echo(
+            "WARNING: the suggested ask is below break-even. Selling here is a "
+            "deliberate loss to recycle capital, not a trade.",
+            err=True,
+        )
+    if not decision.changed:
+        typer.echo("no change worth making")
+
+
+@app.command()
+def books(
+    fee_table: Annotated[str, typer.Option(help="Fee table for unsettled trades.")] = "ebay_uk",
+) -> None:
+    """Cost basis, realised margin, capital deployed, and what is ageing.
+
+    Settled and estimated margin are reported on separate lines and never summed.
+    A margin computed from settlement data and one computed from the provisional fee
+    table are both plausible numbers; added together they make a total that is
+    neither, with no way afterwards to tell which half was real.
+    """
+    settings = get_settings()
+    table_path = FEE_TABLE_DIR / f"{fee_table}.yaml"
+    if not table_path.is_file():
+        typer.echo(f"no fee table at {table_path}", err=True)
+        raise typer.Exit(code=2)
+    fees = load_fee_table(table_path)
+
+    engine = make_engine(settings.db_url)
+    with session_scope(engine) as session:
+        trades = ledger(session, fees)
+        position = capital_position(session, now=utcnow())
+
+    typer.echo("CAPITAL")
+    typer.echo(f"  deployed   {pence_to_decimal(position.deployed_pence):>10}  (unsold stock)")
+    typer.echo(f"  recycled   {pence_to_decimal(position.recycled_pence):>10}  (gross returned)")
+    if position.aged_count:
+        typer.echo(
+            f"  ageing     {pence_to_decimal(position.aged_pence):>10}  "
+            f"({position.aged_count} items over {AGEING_DAYS} days)"
+        )
+
+    typer.echo("")
+    typer.echo("STOCK")
+    for state, count, cost in position.by_state:
+        if count:
+            typer.echo(f"  {state.value:<12} {count:>4} items  {pence_to_decimal(cost):>10}")
+
+    settled_net, estimated_net, settled_count = totals(trades)
+    typer.echo("")
+    typer.echo("REALISED")
+    if not trades:
+        typer.echo("  no completed sales yet")
+        return
+    typer.echo(f"  settled    {pence_to_decimal(settled_net):>10}  ({settled_count} trades)")
+    if estimated_net or len(trades) > settled_count:
+        typer.echo(
+            f"  estimated  {pence_to_decimal(estimated_net):>10}  "
+            f"({len(trades) - settled_count} trades, provisional fees)"
+        )
+        typer.echo("  not summed: one is measured, the other is not")
+    if not table_path.is_file() or fees.provisional:
+        typer.echo("")
+        typer.echo("fees are still provisional -- run `arb reconcile-fees` (see `arb provenance`)")
+
+
+@app.command()
+def labels(
+    source: Annotated[Path, typer.Argument(help="Directory of carrier label PDFs.")],
+    out: Annotated[Path, typer.Option(help="Where to write the merged batch.")] = Path(
+        "labels.pdf"
+    ),
+) -> None:
+    """Crop carrier labels to 6x4 and merge them into one printable batch.
+
+    An unrecognised carrier passes through uncropped rather than being cropped to a
+    guessed region. That prints badly and visibly; a wrong crop prints beautifully
+    and fails at the counter after the parcel is packed.
+    """
+    if not source.is_dir():
+        typer.echo(f"not a directory: {source}", err=True)
+        raise typer.Exit(code=2)
+    pdfs = sorted(source.glob("*.pdf"))
+    if not pdfs:
+        typer.echo(f"no PDFs in {source}", err=True)
+        raise typer.Exit(code=1)
+
+    result = merge_labels(pdfs, out)
+    typer.echo(f"wrote {out}: {result.written} labels ({result.cropped} cropped)")
+    if result.unidentified:
+        typer.echo(
+            f"WARNING: {result.unidentified} pages had an unrecognised carrier and went "
+            "in uncropped -- check them before printing",
+            err=True,
+        )
+    if result.failed:
+        typer.echo(f"WARNING: {result.failed} files could not be read", err=True)
+
+
+@app.command()
+def tax(
+    year: Annotated[
+        int | None, typer.Option(help="Tax year by starting year, e.g. 2026 for 2026/27.")
+    ] = None,
+    fee_table: Annotated[str, typer.Option(help="Fee table for unsettled sales.")] = "ebay_uk",
+) -> None:
+    """Total a UK tax year and compare the two allowance methods.
+
+    **This is a preparation aid, not a tax return and not tax advice.** It totals what
+    the ledger knows and applies two legislated rules. It does not compute tax owed --
+    that needs your other income, personal allowance and National Insurance position,
+    none of which live here -- and it deliberately prints no SA103 box numbers,
+    because box numbering changes between years and forms and a wrong one produces a
+    return that is confidently incorrect.
+
+    Cash basis is assumed: income counts when received, costs when paid. That is the
+    default for sole traders, and it means a trade bought in March and sold in May
+    puts its cost in one tax year and its income in the next.
+    """
+    settings = get_settings()
+    table_path = FEE_TABLE_DIR / f"{fee_table}.yaml"
+    if not table_path.is_file():
+        typer.echo(f"no fee table at {table_path}", err=True)
+        raise typer.Exit(code=2)
+    fees = load_fee_table(table_path)
+    target = TaxYear(year) if year is not None else tax_year_of(utcnow())
+
+    engine = make_engine(settings.db_url)
+    with session_scope(engine) as session:
+        summary = summarise_tax_year(session, target, fees)
+
+    typer.echo(
+        f"UK tax year {target.label}  (6 Apr {target.start_year} - 5 Apr {target.start_year + 1})"
+    )
+    typer.echo("")
+    typer.echo(
+        f"  gross income      {pence_to_decimal(summary.gross_income_pence):>10}"
+        f"   ({summary.sales_count} sales)"
+    )
+    typer.echo(f"  allowable costs   {pence_to_decimal(summary.allowable_costs_pence):>10}")
+    typer.echo("")
+    typer.echo("TAXABLE PROFIT, two methods -- you may use one, never both")
+    typer.echo(f"  deduct expenses   {pence_to_decimal(summary.profit_actual_expenses_pence):>10}")
+    typer.echo(
+        f"  £1,000 allowance  {pence_to_decimal(summary.profit_trading_allowance_pence):>10}"
+    )
+    typer.echo(f"  lower            {summary.lower_method:>11}")
+
+    typer.echo("")
+    if summary.below_threshold:
+        typer.echo(
+            f"  gross is at or under {pence_to_decimal(TRADING_ALLOWANCE_PENCE)} -- full relief "
+            "normally applies, and this income alone does not usually require registration"
+        )
+    else:
+        typer.echo(
+            f"  gross is over {pence_to_decimal(TRADING_ALLOWANCE_PENCE)} -- if not already "
+            f"registered for Self Assessment, the deadline is {target.register_by}"
+        )
+    if summary.straddling_count:
+        typer.echo(
+            f"  {summary.straddling_count} trades straddle a year boundary: cost in one year, "
+            "income in the next. Correct under cash basis, different under accruals."
+        )
+
+    if summary.figures_are_provisional:
+        typer.echo("")
+        typer.echo(
+            f"WARNING: {summary.estimated_fees_count} sales are costed from the provisional fee "
+            "table, not settlement. These are not tax figures until `arb reconcile-fees` has run.",
+            err=True,
+        )
+    typer.echo("")
+    typer.echo("Figures to check with an accountant. Not a filing, and not tax advice.")

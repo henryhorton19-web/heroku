@@ -67,9 +67,11 @@ no dropped lint rules, no relaxed strict mode. If a rule genuinely can't be
 satisfied, stop and escalate.
 
 ### 4.8 Don't build what you can install
-Fee tables, valuation and ranking, the quality lexicon, venue glue, and one LLM
-extraction prompt. Everything else — HTTP, retries, ORM, PDF handling, image
-segmentation, fuzzy matching, CLI, config — is an installed dependency.
+Author only what is genuinely ours: fee tables, valuation and ranking, the quality
+lexicon, venue glue, and one LLM extraction prompt. Everything else — HTTP, retries,
+ORM, PDF handling, image segmentation, fuzzy matching, CLI, config — is an installed
+dependency. Before writing a module, check whether a maintained package already does
+it; reimplementing a dependency is the failure mode this rule exists to prevent.
 
 ### 4.10 Precision over recall on anything that spends money
 A missed opportunity costs nothing. A false positive costs the trade. Every

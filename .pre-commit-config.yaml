@@ -30,7 +30,7 @@ repos:
         pass_filenames: false
 
       - id: guard
-        name: guard (suppressions, Any, secrets)
+        name: guard (suppressions, Any, line budget, secrets)
         entry: uv run python scripts/guard.py
         language: system
         types: [python]

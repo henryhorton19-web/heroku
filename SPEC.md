@@ -1,6 +1,7 @@
 # SPEC — current module contract
 
-**M1 buyside at 95%. M2–M5 not started. See ROADMAP.md for sequencing.**
+**M1 buyside 95%. M2 sellside: all buildable items done. M3 books: lifecycle,
+ledger, tax and reconcile done. M4: sweep done. M5 not started.**
 Updated 20 Aug 2026. This file is the contract; `CONTEXT.md` is the standing policy.
 
 ---
@@ -22,6 +23,15 @@ Updated 20 Aug 2026. This file is the contract; `CONTEXT.md` is the standing pol
 | `arb/comps/soldcomps.py` | SoldComps `CompSource`. Contract verified against their docs. | 145 |
 | `arb/sourcing/quality.py` | Quality lexicon v0, negation- and boundary-aware. | 110 |
 | `arb/sourcing/contest.py` | Contest density over `favourites`/`views`. Pure. Thresholds provisional. | 157 |
+| `arb/selling/taxonomy.py` | eBay aspect enums: parse + validate a draft before publish. Pure. | 270 |
+| `arb/selling/aspects_repo.py` | Aspect cache. Upsert, unlike `comps_cache`. | 95 |
+| `arb/selling/finances.py` | Settlement parsing from `sell_finances`. Pure. GBP only. | 158 |
+| `arb/books/reconcile.py` | Fits fee components to settlement. Refuses below the floor. | 258 |
+| `arb/selling/reprice.py` | Ladder + offer bands. Consumes `Valuation`, never produces one. | 200 |
+| `arb/selling/labels.py` | Carrier detect, crop to 6x4, merge. Refuses rather than guesses. | 170 |
+| `arb/books/ledger.py` | Realised margin, capital deployed, ageing. Settled ≠ estimated. | 190 |
+| `arb/books/tax.py` | UK tax year, trading allowance, cash basis. A prep aid, not a filing. | 205 |
+| `arb/sourcing/sweep.py` | Cohort tracking for real days-to-sell. Corroborates before counting. | 185 |
 | `arb/sourcing/rank.py` | Capital-velocity ranking + the unknown-velocity policy. | 120 |
 | `arb/sourcing/scanner.py` | `scan()` — **pure function**; monitors and AutoBuy wrap it. | 75 |
 | `arb/sourcing/vinted.py` | `BuyVenue` adapter. Pure mapping split from the network call. | 105 |
@@ -33,11 +43,10 @@ Updated 20 Aug 2026. This file is the contract; `CONTEXT.md` is the standing pol
 | `arb/config.py` | `Settings` via pydantic-settings, `ARB_` prefix. All credentials optional. | 42 |
 | `arb/store.py` | Engine, `session_scope`, `upgrade_to_head`. | 40 |
 
-**Authored source: 3,147 lines**, tracked for visibility. The count
-includes docstrings, which are a large share of it — the modules are heavily commented
-because the reasoning behind a threshold is the thing that gets lost, not the threshold.
+The modules are heavily commented because the reasoning behind a threshold is the
+thing that gets lost, not the threshold itself.
 
-Gate status: ruff clean, mypy strict clean, 354 tests, 97% coverage. Full CI gate
+Gate status: ruff clean, mypy strict clean, 487 tests, 87% coverage. Full CI gate
 verified locally including migrate-from-empty and `uv lock --check`.
 
 ---
@@ -357,3 +366,296 @@ against `resolve()` at the call site that needs it, not a flag here.
 It also prints which `fee_table_version`s scored the existing book, and warns when
 there is more than one. That is what stamping was for: two versions in one book means
 the margins are not comparable with each other and a re-score is owed.
+
+---
+
+## 14. W2 — what the taxonomy gate decided
+
+**The gate is local and runs before publish.** eBay's rejection is sometimes silence:
+a non-compliant listing can be accepted and simply not indexed. A local answer is
+immediate, free, and — unlike eBay's — always actually arrives.
+
+**A cache miss refuses.** `parse_aspects` returns `None` for an uncached category
+rather than an empty aspect set, because an empty set validates everything. A miss
+that silently disabled the gate is the one outcome worse than refusing to publish.
+
+**The aspect cache upserts; `comps_cache` appends.** Opposite rules, for a real
+reason. A comp is a market observation at a point in time and can never be
+re-fetched once the 90-day window rolls past. Taxonomy enums are eBay's *current*
+published rules — an old copy is not history, it is a stale rule that will hold your
+listing. `category_tree_version` is stored so a bump is visible.
+
+**`ListingDraft.condition_band` became optional.** It was required, which made the
+"Condition is missing" case unrepresentable and therefore untestable — the model was
+stricter than the failure it needed to describe. The requirement did not disappear;
+it moved to the gate, which is where eBay enforces it and where the violation can be
+reported alongside the others.
+
+**`ebay_marketplace_id` is `Settings`, not a CLI flag.** Aspect enums differ per
+marketplace, so mixing EBAY_GB sizes into an EBAY_US listing is a held listing. It is
+an installation property, not a per-invocation choice.
+
+### Still open in W2
+
+| Task | Note |
+|---|---|
+| Publish via `ebay_rest` Sell Inventory | needs credentials to verify |
+| Sell Fulfillment client → unblocks **P1** | highest remaining value |
+| Repricing + offer ladders | must call the same `value()`; no second pricing path |
+| LLM listing copy | needs `ARB_ANTHROPIC_API_KEY` |
+| `rembg` images | pass `-m u2net_cloth_seg`; default weights need a paid licence |
+| Labels: `pdfplumber` → crop → `pypdf` | self-contained, testable without credentials |
+
+---
+
+## 15. Reconciliation — what closing P1 decided
+
+**The fees are in `sell_finances`, not `sell_fulfillment`.** A correction to the
+roadmap. Fulfillment's `Order` carries `totalMarketplaceFee`, but as a lump sum, and
+our table is componentised — any split of one total across three components fits it
+equally well. `getTransactions` exposes `orderLineItems[].marketplaceFees[]` with a
+`feeType` per fee, which is the level the table is actually written at.
+
+**Reconcile corrects values; it does not infer structure.** The table declares which
+components are percentages and which are flat, and reconcile re-measures those
+numbers. Inferring the shape from data is possible and a bad idea: with a handful of
+settlements almost any structure fits, and the result matches history perfectly while
+predicting nothing.
+
+**An unmodelled `feeType` is the important output.** eBay charges `AD_FEE` for
+Promoted Listings and the table does not model it. Silently ignoring a fee you are
+being charged overstates every margin by exactly that amount, permanently, and
+nothing downstream can detect it. Unmapped types are reported to stderr, counted in
+the realised total, and carried into the rewritten table as a comment. The end-to-end
+run shows why this matters: the assumed final value fee was *too high* (12.50% vs a
+measured 12.00%), yet total drift was still **+£1.48 against us**, entirely because
+of the fee that was not modelled.
+
+**It refuses below `MIN_SETTLEMENTS`.** A correction fitted to three sales is a guess
+that has learned to look like a measurement — worse than the honest guess it would
+replace, because it arrives wearing the authority of data. Median, not mean, so one
+promoted or discounted order cannot move a rate.
+
+**Refunds are excluded but counted.** Fees are credited back, sometimes on a later
+transaction, so a refunded order is not a clean reading of the fee schedule. They do
+not count toward the floor, which stops refunds from unlocking a correction.
+
+**Writing bumps `fee_table_version`, and that is the point.** The rewrite changes the
+content hash, so every opportunity scored under the old assumption stays findable and
+`arb provenance` shows both versions in the book until they are re-scored.
+
+### One bug this work surfaced
+
+`.gitignore` carried an unanchored `data/`, intended for the cloned Vinted reference
+data at the repo root. It also matched `src/arb/data/`, so **the fee tables were never
+committed**. A fresh clone could not run `arb scan`, and `fee_table_version` — stamped
+on every opportunity so that historical assumptions stay recoverable — pointed at a
+file with no history. Fixed by anchoring to `/data/`; a regression test asserts on the
+pattern. Found by running `--write` end to end and being unable to `git checkout` the
+file it had just rewritten.
+
+---
+
+## 16. Repricing — the one-valuation-engine invariant, enforced
+
+`reprice` **consumes** a `Valuation` and cannot construct one. There is no path
+through the module that produces a price the valuation engine did not already imply,
+which is the invariant made structural rather than merely documented.
+
+The property that encodes it, and the reason it is a Hypothesis test rather than an
+example: **an ask never leaves `[est_p25, est_p60]`**, for any valuation, any elapsed
+time, any decay window. A price outside that band would be the sell side holding its
+own opinion about what an item is worth.
+
+**The two percentiles are used from opposite ends.** Buy side scores at `est_p25` so
+a plausible margin cannot quietly become a loss. Sell side *lists* at `est_p60` and
+decays toward `est_p25` as the item ages. Buying against the optimistic figure and
+selling against the pessimistic one loses money at both ends.
+
+**The floor is `est_p25`, not break-even.** Two different questions, easily confused.
+`est_p25` is what the market pays quickly, and the ladder stops there because below
+it you are not clearing faster, you are donating. Break-even is what *you* need, and
+depends on what you paid — an item bought badly is not worth more because of it. So
+break-even is computed and reported, never allowed to move the ladder.
+
+**Break-even is binary-searched over `fee_model.fees_pence`, not solved
+algebraically.** With one percentage and one fixed component the algebra is trivial;
+the fee table is an arbitrary component list and will grow. The search stays correct
+whatever the table becomes and reuses the fee logic instead of restating it.
+
+**Auto-accept is clamped to break-even, not warned about.** It is the only setting
+here that cannot be supervised — it fires while you are asleep. When break-even sits
+above the ask, `auto_accept_pence` is `None`: there is no offer worth taking
+unattended on an item that cannot be sold profitably, and inventing a band would be
+worse than refusing one.
+
+**Linear decay, deliberately.** A curve is a claim about how demand decays over time
+and nobody has measured that. A straight line is the honest shape for an unmeasured
+relationship. The decay window is **P10** in the register.
+
+**One feedback loop worth remembering.** A Best Offer sale reports the *listed* price
+to eBay's completed listings, so our own accepted offers re-enter the comp set as
+`price_is_upper_bound`. `value()` excludes those by default, which is what stops the
+offer ladder from inflating our own future valuations.
+
+---
+
+## 17. Labels and the books
+
+### Labels — refusing beats guessing, again
+
+**A mis-cropped label is a parcel that does not ship.** It fails at the counter,
+after the item is packed and the sale is made. So an unrecognised carrier passes
+through *uncropped*: that prints badly and visibly, which is the failure you want. A
+wrong crop prints beautifully and fails later.
+
+`pdfplumber` reads the text layer, `pypdf` does the geometry. Both installed. The
+module is glue and a table of crop boxes.
+
+**The crop boxes are measurements but are deliberately not in the placeholder
+register.** Unlike a threshold, a wrong crop box is visible in five seconds by
+looking at the output. The feedback loop is immediate and visual, so it needs no
+bookkeeping — the register is for assumptions whose wrongness is *silent*.
+
+**Fixtures are generated, not vendored.** Real carrier labels carry live tracking
+barcodes and customer addresses, and the repo is public.
+
+### Lifecycle — a column, because implied states cannot be aged
+
+Stockly's states adopted as-is: `scouted → in_transit → listed → sold`. The
+timestamps already implied them, but an implied state cannot be queried, counted or
+aged, so "what is stuck in transit" was a join over three nullable dates rather than
+a WHERE clause.
+
+Migration 0004 backfills from those timestamps, most-advanced rule first. Defaulting
+to `scouted` would have reported every historical purchase as unbought.
+
+Deliberately coarse. A richer state machine is easy to write and hard to keep honest:
+every state nobody updates becomes a lie that queries then trust.
+
+### The ledger — settled and estimated are never summed
+
+The load-bearing decision. Realised margin uses settlement fees where they exist and
+the fee table's prediction otherwise, and `RealisedTrade.settled` carries which all
+the way to the report.
+
+They are reported on **separate lines and never added**. Both are plausible numbers;
+summed, they produce a total that is neither, and afterwards there is no way to tell
+which half was real. Presenting an estimate as a measurement is the specific failure
+the whole placeholder discipline exists to prevent, and the books are where it would
+be easiest to commit.
+
+**Ageing counts unsold stock only.** Old stock that sold is history; old stock that
+has not is the problem, and it is the number that says whether the buy side's
+velocity estimates are worth anything.
+
+### Still open
+
+| Task | Blocked by |
+|---|---|
+| Publish via Sell Inventory | eBay credentials |
+| LLM listing copy | `ARB_ANTHROPIC_API_KEY` |
+| `rembg` images | model weights are not reachable from this network |
+| Dashboard (W3) | nothing — `arb books` is the data behind it |
+| HMRC SA103 mapping (W3) | nothing |
+| W4 automation, W5 multi-venue | nothing |
+
+---
+
+## 18. Tax output — the module written so it cannot overreach
+
+Everywhere else in this codebase, a confident wrong number costs a trade. Here it
+costs a compliance problem, so `books/tax.py` is deliberately built to stop short.
+
+**No SA103 box numbers.** Box numbering changes between tax years and between the
+short and full forms. A wrong box number produces a return that is confidently
+incorrect. The `sa103_category` column exists for when a mapping has been confirmed
+against a specific year's form; nothing in the code fills it in.
+
+**No tax owed.** That needs other income, personal allowance, Scottish rates and a
+National Insurance position, none of which live here. It computes turnover, allowable
+costs, and the two candidate profit figures — and stops.
+
+**Both methods computed, neither recommended.** Which yields the lower taxable profit
+is arithmetic and is reported. Whether to claim it is not, and the asymmetry is real:
+deducting actual expenses can create a loss, claiming the allowance cannot.
+
+### Facts verified 20 Aug 2026 for 2026/27
+
+The trading allowance is **£1,000**, unchanged since 2017/18, and applies to **gross
+income before expenses** — the part most often got wrong, since £1,500 gross against
+£1,400 of costs is over the threshold on £100 of profit. The two methods are mutually
+exclusive. Registration deadline is 5 October following the *end* of the tax year.
+From 2027/28 a simplified service is expected to change reporting obligations between
+£1,000 and £3,000; that changes who must file, not the allowance.
+
+Re-verify against GOV.UK before relying on any of it.
+
+### Cash basis, and why it matters more here than it looks
+
+Cash basis is the default for sole traders: income counts when received, costs when
+paid. For a reseller that means **a single trade can straddle two tax years** — bought
+in March, sold in May, cost in one year and income in the next. Straddling trades are
+counted and reported rather than silently netted, because under traditional accruals
+they would be matched instead and the difference is real money in the wrong year.
+
+Unsold stock is still a cost in the year it was paid for, for the same reason.
+
+### Provenance reaches the tax figures too
+
+A sale still costed from the provisional fee table is flagged, and the report says
+plainly that these are not tax figures until `arb reconcile-fees` has run. A tax
+number resting on an invented fee rate is not a tax number.
+
+### One bug the tests caught
+
+`register_by` was `start_year + 2`. The 2026/27 year ends 5 April 2027, so the
+deadline is October 2027 — `+ 1`. Caught against HMRC's own worked example, and
+exactly the off-by-one that would have gone unnoticed until it mattered.
+
+---
+
+## 19. The sweep — two ways of not producing a plausible wrong number
+
+`days_to_sell` is the denominator of `capital_velocity`, which ranks the entire buy
+side, and eBay's sold endpoint does not carry it. Browse's `itemCreationDate` on the
+*active* side is the route, and taking it correctly needs two refusals.
+
+### A snapshot of active listings is length-biased
+
+The shortcut — pull every active listing, compute `now - itemCreationDate`, take the
+median — is wrong. A slow listing is live for longer and therefore appears in more
+snapshots, so any snapshot over-represents slow sellers and the mean age of actives is
+biased upward relative to the mean time-to-sell. The inspection paradox.
+
+So the module tracks **cohorts**: observe on appearance, watch until disappearance,
+record the duration that actually elapsed. Listings still live are **right-censored** —
+they have lasted at least N days, which is not a duration — and they are excluded
+*structurally*: `resolve_disappearances` only ever receives disappearances, so the
+exclusion is not a filter anyone can forget.
+
+### A disappearance is not a sale
+
+Listings leave search when they sell, when they end unsold, and when the seller
+delists. Fashion runs on 30-day cycles and ended-unsold is ordinary, so counting every
+disappearance as a sale would understate time-to-sell badly and confidently. A
+duration is produced only when the item id turns up in completed sales; everything
+else is `unconfirmed` and fitted to nothing.
+
+`confirmation_rate` is exposed deliberately. A rate collapsing toward zero means
+*either* the id formats have stopped matching *or* the market has stopped clearing,
+and those need very different responses.
+
+### The trap that would have failed silently
+
+Browse returns two identifiers: `itemId` in RESTful form (`v1|1234|0`) and
+`legacyItemId` as the bare number. SoldComps returns the bare number. Matching the
+RESTful id corroborates nothing at all — the sweep would report every disappearance as
+unconfirmed forever while appearing to work perfectly. Pinned by a test.
+
+### P2's bar was raised, not met
+
+`_resolve_velocity` now needs **30 corroborated durations** before closing P2, not one.
+Below that the median is a single slow listing away from moving, and the sweep's whole
+value is that its number is trustworthy enough to rank on. Building the mechanism does
+not close the placeholder; collecting the data does.

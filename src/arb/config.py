@@ -35,6 +35,11 @@ class Settings(BaseSettings):
     anthropic_api_key: SecretStr | None = None
     vinted_base_url: str = "https://www.vinted.co.uk"
 
+    ebay_marketplace_id: str = "EBAY_GB"
+    """Which eBay site the taxonomy enums and fee tables apply to. Per
+    installation rather than per command: aspect enums differ by marketplace, and
+    mixing EBAY_GB sizes with EBAY_US ones is how a listing gets held."""
+
     # Vinted asks not to be scraped. Politeness here is both the terms-of-service
     # posture and the thing that keeps the account alive; see CONSTRAINTS in SPEC.md.
     vinted_requests_per_second: float = Field(default=1.5, gt=0.0, le=2.0)

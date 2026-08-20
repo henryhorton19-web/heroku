@@ -5,8 +5,12 @@ arb.db
 arb.db-wal
 arb.db-shm
 
-# Reference data is cloned, not vendored
-data/
+# Reference data is cloned, not vendored. Anchored with a leading slash so it
+# matches only the repo-root clone target (Settings.data_dir), NOT src/arb/data/,
+# which holds the versioned fee tables. Unanchored, this silently excluded them:
+# a fresh clone had no fee tables, and `fee_table_version` pointed at a file with
+# no history, which defeats the whole point of stamping it onto every score.
+/data/
 
 # Python
 __pycache__/

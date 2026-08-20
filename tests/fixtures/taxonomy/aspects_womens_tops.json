@@ -1,0 +1,144 @@
+{
+  "categoryTreeId": "3",
+  "categoryTreeVersion": "128",
+  "categoryAspects": [
+    {
+      "category": { "categoryId": "53159", "categoryName": "Women's Tops & Shirts" },
+      "aspects": [
+        {
+          "localizedAspectName": "Brand",
+          "aspectConstraint": {
+            "aspectDataType": "STRING",
+            "itemToAspectCardinality": "SINGLE",
+            "aspectMode": "FREE_TEXT",
+            "aspectRequired": true,
+            "aspectUsage": "RECOMMENDED",
+            "aspectEnabledForVariations": false,
+            "aspectApplicableTo": ["ITEM"],
+            "aspectMaxLength": 65
+          },
+          "aspectValues": [
+            { "localizedValue": "Nike" },
+            { "localizedValue": "Adidas" },
+            { "localizedValue": "Unbranded" }
+          ]
+        },
+        {
+          "localizedAspectName": "Department",
+          "aspectConstraint": {
+            "aspectDataType": "STRING",
+            "itemToAspectCardinality": "SINGLE",
+            "aspectMode": "SELECTION_ONLY",
+            "aspectRequired": true,
+            "aspectUsage": "RECOMMENDED",
+            "aspectEnabledForVariations": false,
+            "aspectApplicableTo": ["ITEM"]
+          },
+          "aspectValues": [
+            { "localizedValue": "Women" },
+            { "localizedValue": "Girls" }
+          ]
+        },
+        {
+          "localizedAspectName": "Size",
+          "aspectConstraint": {
+            "aspectDataType": "STRING",
+            "itemToAspectCardinality": "SINGLE",
+            "aspectMode": "SELECTION_ONLY",
+            "aspectRequired": true,
+            "aspectUsage": "RECOMMENDED",
+            "aspectEnabledForVariations": true,
+            "aspectApplicableTo": ["ITEM"]
+          },
+          "aspectValues": [
+            {
+              "localizedValue": "S",
+              "valueConstraints": [
+                {
+                  "applicableForLocalizedAspectName": "Department",
+                  "applicableForLocalizedAspectValues": ["Women"]
+                }
+              ]
+            },
+            {
+              "localizedValue": "M",
+              "valueConstraints": [
+                {
+                  "applicableForLocalizedAspectName": "Department",
+                  "applicableForLocalizedAspectValues": ["Women"]
+                }
+              ]
+            },
+            {
+              "localizedValue": "L",
+              "valueConstraints": [
+                {
+                  "applicableForLocalizedAspectName": "Department",
+                  "applicableForLocalizedAspectValues": ["Women"]
+                }
+              ]
+            },
+            {
+              "localizedValue": "10-11 Years",
+              "valueConstraints": [
+                {
+                  "applicableForLocalizedAspectName": "Department",
+                  "applicableForLocalizedAspectValues": ["Girls"]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "localizedAspectName": "Size Type",
+          "aspectConstraint": {
+            "aspectDataType": "STRING",
+            "itemToAspectCardinality": "SINGLE",
+            "aspectMode": "SELECTION_ONLY",
+            "aspectRequired": false,
+            "aspectUsage": "RECOMMENDED",
+            "aspectEnabledForVariations": false,
+            "aspectApplicableTo": ["ITEM"]
+          },
+          "aspectValues": [
+            { "localizedValue": "Regular" },
+            { "localizedValue": "Petite" },
+            { "localizedValue": "Plus" }
+          ]
+        },
+        {
+          "localizedAspectName": "Colour",
+          "aspectConstraint": {
+            "aspectDataType": "STRING",
+            "itemToAspectCardinality": "SINGLE",
+            "aspectMode": "SELECTION_ONLY",
+            "aspectRequired": false,
+            "aspectUsage": "RECOMMENDED",
+            "aspectEnabledForVariations": true,
+            "aspectApplicableTo": ["ITEM"],
+            "expectedRequiredByDate": "2026-11-01"
+          },
+          "aspectValues": [
+            { "localizedValue": "Black" },
+            { "localizedValue": "Blue" },
+            { "localizedValue": "White" }
+          ]
+        },
+        {
+          "localizedAspectName": "Style",
+          "aspectConstraint": {
+            "aspectDataType": "STRING",
+            "itemToAspectCardinality": "MULTI",
+            "aspectMode": "FREE_TEXT",
+            "aspectRequired": false,
+            "aspectUsage": "OPTIONAL",
+            "aspectEnabledForVariations": false,
+            "aspectApplicableTo": ["ITEM"],
+            "aspectMaxLength": 20
+          },
+          "aspectValues": []
+        }
+      ]
+    }
+  ]
+}

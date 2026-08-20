@@ -1,0 +1,25 @@
+# eBay UK selling fees.
+#
+# PROVISIONAL. Every number below is an assumption, not a measurement. It exists so
+# the pipeline runs end to end, and it is expected to be wrong.
+#
+# `arb reconcile` replaces it: it pulls actual fees from the Sell Fulfillment API for
+# completed sales and rewrites these components from settlement data. Editing this
+# file changes content_hash, which changes fee_table_version, which is how you find
+# every opportunity that was scored under the old assumption.
+#
+# Do not tune these to make an opportunity look good. That is the one change that
+# cannot be detected downstream.
+venue: vinted_uk
+currency: GBP
+provisional: true
+verified_at: null
+source: "PROVISIONAL placeholder — replaced by `arb reconcile` from settlement data"
+components:
+  # Vinted charges the buyer, not the seller, on the UK site. Seller-side cost is
+  # therefore modelled as zero until settlement data proves otherwise. A zero table
+  # is still a versioned assumption, which is the point.
+  - name: seller_fee
+    kind: fixed
+    scope: order
+    amount_pence: 0

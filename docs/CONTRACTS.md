@@ -158,6 +158,56 @@ into Size.
 A listing that publishes but is not indexed looks like success and sells nothing.
 Treat this as a hard gate, not a warning.
 
+### Taxonomy `getItemAspectsForCategory`
+
+*Verified 20 Aug 2026 against `ebay_rest.api.commerce_taxonomy.models` `attribute_map`.*
+
+```jsonc
+{
+  "categoryTreeId": "3",
+  "categoryTreeVersion": "128",
+  "categoryAspects": [{
+    "category": { "categoryId": "53159", "categoryName": "..." },
+    "aspects": [{
+      "localizedAspectName": "Size",
+      "aspectConstraint": {
+        "aspectRequired": true,
+        "aspectMode": "SELECTION_ONLY",   // or FREE_TEXT
+        "aspectUsage": "RECOMMENDED",
+        "aspectDataType": "STRING",
+        "itemToAspectCardinality": "SINGLE",
+        "aspectMaxLength": 65,
+        "expectedRequiredByDate": "2026-11-01"  // becomes required later
+      },
+      "aspectValues": [{
+        "localizedValue": "10-11 Years",
+        "valueConstraints": [{
+          "applicableForLocalizedAspectName": "Department",
+          "applicableForLocalizedAspectValues": ["Girls"]
+        }]
+      }]
+    }]
+  }]
+}
+```
+
+**Three load-bearing facts, each implemented in `selling/taxonomy.py`:**
+
+*`FREE_TEXT` aspects list enum values but accept anything.* Brand is the common case.
+Treating its `aspectValues` as a whitelist rejects every brand eBay has not indexed —
+which is most of the ones worth trading.
+
+*`valueConstraints` scopes a value to another aspect's value.* "10-11 Years" is a
+real Size but only when Department is Girls. Flattening every value into one set
+accepts a childrenswear size on a womenswear listing: non-standard, held, invisible.
+
+*Condition is not an aspect.* It is a separate listing field and never appears in this
+response, so the enum walk cannot enforce it. Checked explicitly.
+
+**`expectedRequiredByDate` is a scheduled break.** Surfaced as a warning rather than a
+block, because blocking today would be wrong and silence means the deadline arrives as
+a wall of held listings.
+
 ---
 
 ## 4. Anthropic API — attribute extraction and listing copy
@@ -180,6 +230,7 @@ Request structured JSON explicitly and parse defensively — strip fences before
 | Vinted reference tables | 20 Aug 2026 | re-clone `0AlphaZero0/Vinted-data` |
 | eBay Browse models | 20 Aug 2026 | `ItemSummary.swagger_types` |
 | eBay size rules | 20 Aug 2026 | eBay seller centre announcements |
+| Taxonomy aspect shape | 20 Aug 2026 | `Aspect.attribute_map` in `ebay_rest` |
 
 SoldComps was showing a sold-listings outage on 20 Aug 2026 (active listings
 unaffected). Check `sold-comps.com/status` before diagnosing an empty comp set as a

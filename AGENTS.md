@@ -10,11 +10,11 @@ Operating brief for a coding agent building this to beta. Read this, then
 A personal reselling tool. Buy underpriced clothing on Vinted, sell it on eBay, and
 keep one honest ledger. Python 3.12, SQLite, uv, mypy strict.
 
-**Working today** (354 tests, CI green, 3,147 authored lines):
+**Working today** (354 tests, CI green):
 valuation · fee model · comp matching · append-only comps cache · SoldComps adapter ·
 quality filter · contest-density filter · pure scanner · capital-velocity ranking ·
-Vinted read adapter · placeholder register · `arb scan` / `buylist` / `decide` /
-`provenance`.
+Vinted read adapter · placeholder register · eBay taxonomy compliance gate ·
+`arb scan` / `buylist` / `decide` / `provenance` / `taxonomy` / `reconcile-fees` / `reprice` / `books` / `labels` / `tax`.
 
 **To build:** sellside publishing, books, dashboard, automation, multi-venue. See
 `ROADMAP.md` §3–§7. All five workstreams are unblocked and can run in parallel.
@@ -36,8 +36,8 @@ All five must pass. CI runs the same plus a migrate-from-empty check and
 
 **Never weaken the gate to make something pass.** No `# type: ignore`, no `# noqa`,
 no `# pragma: no cover`, no relaxed strict mode, no lowered coverage floor.
-`scripts/guard.py` fails the build on any of them. If a rule genuinely cannot be satisfied, stop and escalate rather
-than suppress.
+`scripts/guard.py` fails the build on any of them. If a rule genuinely cannot be
+satisfied, stop and escalate rather than suppress.
 
 Two scoped exceptions exist, both documented at the site with the empirical check
 behind them: `TC003` on `cli.py` (Typer resolves annotations at runtime) and
@@ -99,7 +99,7 @@ not examples.
 
 ## 5. Placeholders — build on them, do not mistake them for data
 
-Nine declared gaps, listed in `ROADMAP.md` §1 with blast radius and printed against
+Ten declared gaps, listed in `ROADMAP.md` §1 with blast radius and printed against
 live state by **`arb provenance`**. Run it before trusting any number this tool
 produces. The important ones:
 
@@ -138,8 +138,9 @@ inventing field names. Re-verify anything older than a month — marketplace API
 `tests/fixtures/`. An autouse fixture clears every `ARB_*` variable so no test can
 pick up real credentials.
 
-**Install rather than author.** Prefer using established dependencies. HTTP, retries, ORM, PDF handling, fuzzy
-matching, CLI and config are all installed.
+**Install rather than author.** HTTP, retries, ORM, PDF handling, fuzzy matching,
+CLI and config are all installed. Before writing a module, check whether a maintained
+package already does it — reimplementing a dependency is the failure mode here.
 
 **Secrets.** `.env`, `ebay_rest.json` and `arb.db` are gitignored and have `.example`
 counterparts. The repo is public. `detect-private-key` runs in pre-commit and the
@@ -164,7 +165,9 @@ src/arb/
   refdata.py        Vinted ID table loader
   cli.py            typer
   comps/            fees · valuation · matching · cache · service · soldcomps
-  sourcing/         quality · contest · rank · scanner · vinted
+  sourcing/         quality · contest · rank · scanner · vinted · sweep
+  selling/          taxonomy gate · aspect cache · settlement parsing · repricing · labels
+  books/            ledger, capital and ageing · fee reconciliation · UK tax year
   data/fees/        versioned YAML fee tables
   migrations/       alembic
 tests/fixtures/     recorded payloads

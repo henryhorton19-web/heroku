@@ -1,0 +1,30 @@
+# eBay UK selling fees.
+#
+# PROVISIONAL. Every number below is an assumption, not a measurement. It exists so
+# the pipeline runs end to end, and it is expected to be wrong.
+#
+# `arb reconcile` replaces it: it pulls actual fees from the Sell Fulfillment API for
+# completed sales and rewrites these components from settlement data. Editing this
+# file changes content_hash, which changes fee_table_version, which is how you find
+# every opportunity that was scored under the old assumption.
+#
+# Do not tune these to make an opportunity look good. That is the one change that
+# cannot be detected downstream.
+venue: ebay_uk
+currency: GBP
+provisional: true
+verified_at: null
+source: "PROVISIONAL placeholder — replaced by `arb reconcile` from settlement data"
+components:
+  - name: final_value_fee
+    kind: percentage
+    scope: item
+    rate: "0.1250"
+  - name: regulatory_operating_fee
+    kind: percentage
+    scope: item
+    rate: "0.0035"
+  - name: fixed_order_fee
+    kind: fixed
+    scope: order
+    amount_pence: 30

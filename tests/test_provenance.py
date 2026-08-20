@@ -301,3 +301,23 @@ def test_gather_treats_a_missing_fee_directory_as_unknown(session: Session, tmp_
     assert state.provisional_fee_tables == ()
     assert state.verified_fee_tables == ()
     assert _status(resolve(state))["P1"] is PlaceholderStatus.UNKNOWN
+
+
+def test_repricing_decay_is_registered_as_a_placeholder() -> None:
+    """The decay window is the capital-velocity thesis compressed into one number,
+    and nobody has measured it. Declared, not assumed away."""
+    assert "P10" in {p.id for p in REGISTER}
+    assert _status(resolve(EMPTY))["P10"] is PlaceholderStatus.OPEN
+
+
+def test_repricing_closes_when_fitted_to_realised_data() -> None:
+    state = EMPTY._replace(reprice_provisional=False)
+    assert _status(resolve(state))["P10"] is PlaceholderStatus.CLOSED
+
+
+def test_a_handful_of_durations_does_not_close_velocity() -> None:
+    """One slow listing moves a median built from five observations. The sweep's
+    value is that the number is trustworthy enough to rank on."""
+    state = EMPTY._replace(sold_obs_total=500, sold_obs_with_days=5)
+    assert _status(resolve(state))["P2"] is PlaceholderStatus.OPEN
+    assert "30" in _evidence(resolve(state))["P2"]

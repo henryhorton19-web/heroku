@@ -317,8 +317,15 @@ class ListingDraft(_Frozen):
     category_id: str = Field(min_length=1)
     price_pence: NonNegPence
     size: str = Field(min_length=1)
-    condition_band: ConditionBand
+    condition_band: ConditionBand | None = None
     brand: str = Field(min_length=1)
+    aspects: tuple[tuple[str, str], ...] = ()
+    """Item specifics beyond the named fields, as (name, value) pairs.
+
+    A tuple rather than a mapping because the model is frozen and therefore hashed,
+    and a dict field would make it unhashable. Size and Brand stay named fields
+    because the August 2026 rules made those two hard requirements, so they are not
+    optional extras."""
     image_paths: tuple[str, ...] = ()
     qty: int = Field(default=1, ge=1)
 

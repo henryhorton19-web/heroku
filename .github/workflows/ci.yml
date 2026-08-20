@@ -46,7 +46,7 @@ jobs:
       - name: Types
         run: uv run mypy
 
-      - name: Guard (suppressions, authored Any, line budget, secret hygiene)
+      - name: Guard (suppressions, authored Any, secret hygiene)
         run: uv run python scripts/guard.py
 
       - name: Tests

@@ -135,3 +135,26 @@ def test_non_mapping_yaml_is_rejected(tmp_path: Path) -> None:
     bad.write_text("- not\n- a mapping\n", encoding="utf-8")
     with pytest.raises(TypeError, match="must be a YAML mapping"):
         load_fee_table(bad)
+
+
+def test_fee_tables_are_not_excluded_by_gitignore() -> None:
+    """The fee tables must be version-controlled, and once were not.
+
+    `.gitignore` carried an unanchored `data/` intended for the cloned Vinted
+    reference data at the repo root. It also matched `src/arb/data/`, so the fee
+    tables were silently excluded: a fresh clone had no fee tables and `arb scan`
+    could not run, and worse, `fee_table_version` stamped every opportunity with a
+    pointer to a file that had no history. The stamp exists so you can recover the
+    assumptions behind a historical score; untracked, it pointed at nothing.
+
+    Asserted on the pattern rather than by shelling out to git, so it holds in any
+    checkout and needs no repository.
+    """
+    ignore = (Path(__file__).resolve().parent.parent / ".gitignore").read_text(encoding="utf-8")
+    patterns = [
+        line.strip()
+        for line in ignore.splitlines()
+        if line.strip() and not line.lstrip().startswith("#")
+    ]
+    assert "data/" not in patterns, "unanchored data/ also excludes src/arb/data/"
+    assert "/data/" in patterns, "the repo-root clone target should still be ignored"
