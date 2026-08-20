@@ -36,12 +36,15 @@ if TYPE_CHECKING:
     from sqlalchemy.pool import ConnectionPoolEntry
 
 __all__ = [
+    "AutobuyState",
     "Base",
     "CompsCache",
     "Decisions",
     "Inventory",
     "Listings",
+    "MonitorRuns",
     "Opportunities",
+    "PurchaseAttempts",
     "SoldObs",
     "TaxonomyAspects",
     "UtcDateTime",
@@ -270,8 +273,92 @@ class Inventory(Base):
     actual_ship_pence: Mapped[int | None] = mapped_column(Integer)
     realised_net_pence: Mapped[int | None] = mapped_column(Integer)
     sa103_category: Mapped[str | None] = mapped_column(String)
+    synthetic: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="0"
+    )
+    """Seeded rather than traded. The dashboard was built against generated data (P7)
+    and this column is what stops that data from ever being mistaken for a result:
+    synthetic rows are excluded from the provenance counts, so seeding cannot close a
+    placeholder, and the dashboard marks them on screen."""
 
     __table_args__ = (Index("idx_inventory_state", "state", "acquired_at"),)
+
+
+class PurchaseAttempts(Base):
+    """Every attempt to buy, keyed so a retry cannot become a second purchase.
+
+    `idempotency_key` is UNIQUE and derived from the venue and listing id, so the
+    duplicate is refused by the database rather than by application logic that a
+    retry path might skip. An AutoBuy without this double-buys on retry, and you
+    find out when two identical jumpers arrive.
+
+    Rows are written *before* the purchase is attempted and updated after. A crash
+    mid-purchase therefore leaves a claimed key rather than nothing, which fails
+    closed: the retry is blocked and a human looks, instead of the retry buying a
+    second copy.
+    """
+
+    __tablename__ = "purchase_attempts"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    idempotency_key: Mapped[str] = mapped_column(String, nullable=False, unique=True)
+    venue: Mapped[str] = mapped_column(String, nullable=False)
+    external_id: Mapped[str] = mapped_column(String, nullable=False)
+    opportunity_id: Mapped[int | None] = mapped_column(ForeignKey("opportunities.id"))
+    spend_pence: Mapped[int] = mapped_column(Integer, nullable=False)
+    status: Mapped[str] = mapped_column(String, nullable=False)
+    attempted_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
+    completed_at: Mapped[datetime | None] = mapped_column(UtcDateTime)
+    error: Mapped[str | None] = mapped_column(String)
+
+    __table_args__ = (Index("idx_attempts_time", "attempted_at"),)
+
+
+class AutobuyState(Base):
+    """The dead-man switch. One row, id=1.
+
+    `armed_until` is an expiry, not a boolean, and that is the whole design: AutoBuy
+    requires periodic affirmative action to keep running, so walking away from the
+    machine stops it rather than leaving it spending unattended. It fails closed.
+    """
+
+    __tablename__ = "autobuy_state"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    armed_until: Mapped[datetime | None] = mapped_column(UtcDateTime)
+    kill_switch: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="0"
+    )
+    updated_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
+    note: Mapped[str | None] = mapped_column(String)
+
+
+class MonitorRuns(Base):
+    """One row per monitor execution, written whether it succeeded or failed.
+
+    This table exists because of a specific failure: **a monitor that has stopped
+    working looks exactly like a quiet market.** Both produce no alerts. Without a
+    heartbeat there is no way to tell "nothing matched" from "nothing ran", and the
+    second one is silent for as long as you let it be.
+
+    `status` and `error` are recorded on failure rather than the row being skipped,
+    for the same reason: a crashed run that leaves no trace is indistinguishable from
+    a run that never started.
+    """
+
+    __tablename__ = "monitor_runs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    monitor: Mapped[str] = mapped_column(String, nullable=False)
+    started_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
+    finished_at: Mapped[datetime | None] = mapped_column(UtcDateTime)
+    status: Mapped[str] = mapped_column(String, nullable=False)
+    listings_seen: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    new_listings: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    ranked: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    error: Mapped[str | None] = mapped_column(String)
+
+    __table_args__ = (Index("idx_monitor_runs", "monitor", "started_at"),)
 
 
 class TaxonomyAspects(Base):

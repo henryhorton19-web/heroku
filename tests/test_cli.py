@@ -372,3 +372,82 @@ def test_scan_report_counts_contested_listings() -> None:
         ),
         CompsResult(cache_hits=1, fetches=0, quota_exhausted=False),
     )
+
+
+# ------------------------------------------------- autobuy rails (added with autobuy.py)
+
+
+def test_autobuy_starts_disarmed_and_blocked() -> None:
+    """Fails closed on a fresh database. Nothing has to be switched off first."""
+    runner.invoke(app, ["db", "upgrade"])
+    result = runner.invoke(app, ["autobuy", "status"])
+    assert result.exit_code == 1
+    assert "armed          no" in result.output
+
+
+def test_autobuy_status_names_unmeasured_fees_as_the_blocker() -> None:
+    """The roadmap's one hard ordering rule, surfaced where an operator will meet it."""
+    runner.invoke(app, ["db", "upgrade"])
+    result = runner.invoke(app, ["autobuy", "status"])
+    assert "P1 is open" in result.output
+
+
+def test_arming_is_bounded() -> None:
+    runner.invoke(app, ["db", "upgrade"])
+    assert runner.invoke(app, ["autobuy", "arm", "--hours", "99"]).exit_code == 2
+    assert runner.invoke(app, ["autobuy", "arm", "--hours", "0"]).exit_code == 2
+
+
+def test_arming_records_an_expiry_not_a_flag() -> None:
+    runner.invoke(app, ["db", "upgrade"])
+    result = runner.invoke(app, ["autobuy", "arm", "--hours", "2"])
+    assert result.exit_code == 0
+    assert "armed until" in result.output
+
+
+def test_the_kill_switch_blocks_arming() -> None:
+    """Re-arming must not silently clear a stop someone engaged deliberately."""
+    runner.invoke(app, ["db", "upgrade"])
+    runner.invoke(app, ["autobuy", "stop"])
+    result = runner.invoke(app, ["autobuy", "arm"])
+    assert result.exit_code == 2
+    assert "kill switch is engaged" in result.output
+
+
+def test_resume_clears_the_switch_without_arming() -> None:
+    """Clearing a stop and enabling spending are two decisions, not one."""
+    runner.invoke(app, ["db", "upgrade"])
+    runner.invoke(app, ["autobuy", "stop"])
+    result = runner.invoke(app, ["autobuy", "resume"])
+    assert result.exit_code == 0
+    assert "still disarmed" in result.output
+    assert "armed          no" in runner.invoke(app, ["autobuy", "status"]).output
+
+
+def test_stop_disarms_immediately() -> None:
+    runner.invoke(app, ["db", "upgrade"])
+    runner.invoke(app, ["autobuy", "arm", "--hours", "4"])
+    runner.invoke(app, ["autobuy", "stop"])
+    output = runner.invoke(app, ["autobuy", "status"]).output
+    assert "ENGAGED" in output
+    assert "armed          no" in output
+
+
+def test_dryrun_runs_without_arming() -> None:
+    """A dry-run you have to arm for is one nobody runs."""
+    runner.invoke(app, ["db", "upgrade"])
+    result = runner.invoke(app, ["autobuy", "dryrun"])
+    assert result.exit_code == 0
+
+
+def test_books_and_tax_run_on_an_empty_database() -> None:
+    runner.invoke(app, ["db", "upgrade"])
+    assert runner.invoke(app, ["books"]).exit_code == 0
+    assert runner.invoke(app, ["tax", "--year", "2026"]).exit_code == 0
+
+
+def test_monitor_health_exits_non_zero_when_never_run() -> None:
+    runner.invoke(app, ["db", "upgrade"])
+    result = runner.invoke(app, ["monitor", "health", "nike"])
+    assert result.exit_code == 1
+    assert "STALE" in result.output

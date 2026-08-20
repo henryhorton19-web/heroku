@@ -151,11 +151,11 @@ no code change.
 | Task | Effort |
 |---|---|
 | Inventory lifecycle as an explicit column | done |
-| Synthetic seed generator — realistic trades for dashboard development | 0.5d |
+| Synthetic seed generator — realistic trades for dashboard development | done |
 | Ledger: cost basis, real fees, realised net | done |
 | Capital deployed vs recycled, ageing over 60 days | done |
 | `arb reconcile-fees` — predicted vs realised, rewrites fee YAML, closes **P1** | done |
-| Dashboard: margins, profit, run rate, verticals, tasks, outstanding | 2d |
+| Dashboard: margins, profit, run rate, verticals, tasks, outstanding | done |
 | HMRC: £1,000 trading allowance flag | done (SA103 box mapping deliberately not) |
 
 **Lifecycle states — adopt Stockly's:** `Scouted → Sniped → In-Transit → Enhanced →
@@ -181,10 +181,10 @@ if so take Stockly's *component layout and analytics views*, not its persistence
 
 | Task | Effort |
 |---|---|
-| Scheduler + seen-set diff around `scan()` | 2d |
-| Notifications via `apprise` | 0.5d |
+| Scheduler + seen-set diff around `scan()` | done |
+| Notifications via `apprise` | done |
 | Active-listing sweep → real `days_to_sell`, closes **P2** | done (needs 30 durations) |
-| AutoBuy rails: spend caps, idempotency keys, dead-man switch | 3d |
+| AutoBuy rails: spend caps, idempotency keys, dead-man switch | done |
 | AutoBuy dry-run harness, runs on synthetic decisions (**P8**) | 1.5d |
 | AutoBuy purchase execution | 2d |
 

@@ -361,15 +361,20 @@ def gather(session: Session, fee_dir: Path) -> LiveState:
     )
     realised = (
         session.scalar(
-            select(func.count()).select_from(Inventory).where(Inventory.sold_at.is_not(None))
+            select(func.count())
+            .select_from(Inventory)
+            .where(Inventory.sold_at.is_not(None), Inventory.synthetic.is_(False))
         )
         or 0
     )
+    # Synthetic rows are excluded everywhere in this function. Seeding the
+    # dashboard with generated trades must not be able to close a placeholder --
+    # that would be the register lying, which is the one thing it exists not to do.
     settled = (
         session.scalar(
             select(func.count())
             .select_from(Inventory)
-            .where(Inventory.actual_fees_pence.is_not(None))
+            .where(Inventory.actual_fees_pence.is_not(None), Inventory.synthetic.is_(False))
         )
         or 0
     )
@@ -377,7 +382,7 @@ def gather(session: Session, fee_dir: Path) -> LiveState:
         session.scalar(
             select(func.count())
             .select_from(Inventory)
-            .where(Inventory.actual_ship_pence.is_not(None))
+            .where(Inventory.actual_ship_pence.is_not(None), Inventory.synthetic.is_(False))
         )
         or 0
     )

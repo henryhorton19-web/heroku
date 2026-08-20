@@ -1,7 +1,7 @@
 # SPEC — current module contract
 
-**M1 buyside 95%. M2 sellside: all buildable items done. M3 books: lifecycle,
-ledger, tax and reconcile done. M4: sweep done. M5 not started.**
+**M1 buyside 95%. M2 sellside: all buildable items done. M3 books: complete. M4: sweep, monitors and AutoBuy rails done; execution deliberately blocked.
+M5 not started.**
 Updated 20 Aug 2026. This file is the contract; `CONTEXT.md` is the standing policy.
 
 ---
@@ -32,6 +32,10 @@ Updated 20 Aug 2026. This file is the contract; `CONTEXT.md` is the standing pol
 | `arb/books/ledger.py` | Realised margin, capital deployed, ageing. Settled ≠ estimated. | 190 |
 | `arb/books/tax.py` | UK tax year, trading allowance, cash basis. A prep aid, not a filing. | 205 |
 | `arb/sourcing/sweep.py` | Cohort tracking for real days-to-sell. Corroborates before counting. | 185 |
+| `arb/monitor.py` | Seen-set diff around `scan()` + heartbeat. Staleness is a condition. | 200 |
+| `arb/autobuy.py` | Purchase authorisation. Pure, fails closed, never executes. | 215 |
+| `arb/books/verticals.py` | Niche aggregates + synthetic seed. Seed rows cannot close a gap. | 160 |
+| `arb/dashboard.py` | One self-contained HTML file. Colour encodes provenance. | 245 |
 | `arb/sourcing/rank.py` | Capital-velocity ranking + the unknown-velocity policy. | 120 |
 | `arb/sourcing/scanner.py` | `scan()` — **pure function**; monitors and AutoBuy wrap it. | 75 |
 | `arb/sourcing/vinted.py` | `BuyVenue` adapter. Pure mapping split from the network call. | 105 |
@@ -46,7 +50,7 @@ Updated 20 Aug 2026. This file is the contract; `CONTEXT.md` is the standing pol
 The modules are heavily commented because the reasoning behind a threshold is the
 thing that gets lost, not the threshold itself.
 
-Gate status: ruff clean, mypy strict clean, 487 tests, 87% coverage. Full CI gate
+Gate status: ruff clean, mypy strict clean, 550 tests, 88% coverage. Full CI gate
 verified locally including migrate-from-empty and `uv lock --check`.
 
 ---
@@ -659,3 +663,164 @@ unconfirmed forever while appearing to work perfectly. Pinned by a test.
 Below that the median is a single slow listing away from moving, and the sweep's whole
 value is that its number is trustworthy enough to rank on. Building the mechanism does
 not close the placeholder; collecting the data does.
+
+---
+
+## 20. Monitors — silence is ambiguous, so it is made explicit
+
+`scan()` was kept pure in W1 so that monitoring would be additive. It was: a monitor
+is a loop, a set difference and a notifier. Nothing inside `scan` changed.
+
+**The failure the design is built around: a monitor that has stopped working looks
+exactly like a quiet market.** Both produce no alerts. A crashed scheduler, an expired
+session, a changed endpoint and a genuinely empty market are indistinguishable from
+outside, and the difference surfaces weeks later as "why have I bought nothing".
+
+Three things follow from that:
+
+*`monitor_runs` is written on the failure path.* A crashed run that leaves no trace is
+indistinguishable from one that never started.
+
+*A monitor that has never run reports **stale**, not "healthy, no alerts".* Absence of
+alerts is never itself evidence of anything.
+
+*`arb monitor health` exits non-zero when stale*, so a cron wrapper can alert on the
+monitor rather than only on what the monitor finds. Something has to watch the watcher.
+
+### Alerts fire on newly-*seen* listings, not every ranked one
+
+The `listings` table is the seen set — `upsert_listing` already preserves `first_seen`
+on conflict, and a second seen-set store would be a second thing to keep in sync and
+therefore a second thing to drift.
+
+Alerting on everything currently ranked would re-send yesterday's standing inventory
+on every poll. Repeated notifications get muted, and a muted monitor is off without
+anyone having decided to turn it off. Rejected listings count as seen too, or the next
+poll spends comps quota re-pricing stock already rejected.
+
+### One pass, not a loop
+
+`arb monitor run` does a single pass. Scheduling belongs to cron or a systemd timer,
+which already handle restarts, overlap and backoff correctly. A hand-rolled loop here
+would be a worse version of something already installed on the machine — the same
+"install rather than author" rule that put `apprise` in rather than an SMTP client.
+
+With no `ARB_NOTIFY_URL` set, alerts print to stdout. That is the right default rather
+than a silent no-op: a monitor whose notifier is misconfigured must not fail silently,
+because that is the same silence as a quiet market.
+
+### Still open in W4
+
+AutoBuy: rails (spend caps, idempotency keys, dead-man switch), then the dry-run
+harness, then purchase execution — in that order, and **execution stays blocked while
+P1 is open**. Automated spending against unmeasured fees repeats a mistake at machine
+speed.
+
+---
+
+## 21. AutoBuy rails — authorisation, never execution
+
+`autobuy.py` decides what may be bought and buys nothing. The separation is the
+design: the decision to spend is a pure function, exhaustively testable and reviewable
+in one file, while the part that would touch a checkout is elsewhere and inert until
+this says yes.
+
+**Every rail fails closed.** A missing fact, an expired token, an unreadable state row
+— all refuse. A wrongly-refused purchase costs a missed item, which costs nothing. A
+wrongly-allowed one costs money at machine speed while nobody is watching.
+
+### The hard rule is enforced, not documented
+
+ROADMAP §9's single ordering rule — do not enable purchase execution while **P1** is
+open — is a code path here. `_fees_measured()` consults the same register
+`arb provenance` prints rather than restating the condition, because a second
+definition of "are the fees real yet" would drift from the first, and this is the one
+rail whose being wrong spends money automatically.
+
+Verified live: armed for four hours, `arb autobuy status` still exits 1.
+
+### Armed, not enabled
+
+`armed_until` is an **expiry**, not a flag, so walking away from the machine stops
+AutoBuy. A boolean stays true forever, which is exactly the state you do not want to
+discover a fortnight later. Capped at 24 hours — the expiry only protects you if it is
+shorter than your attention span.
+
+`stop` and `resume` are separate from `arm`: clearing a deliberate halt and re-enabling
+spending are two decisions, and collapsing them means a `resume` quietly starts buying.
+
+### Three caps, because they bound three different disasters
+
+Per run bounds a bad batch. Per day bounds a bad afternoon. Outstanding bounds how much
+capital can sit in unsold stock at once. **A per-run cap alone permits twenty runs an
+hour.** Defaults are deliberately small; the right way to raise one is deliberately,
+after the dry-run has been checked, not by discovering the default was already
+generous.
+
+A cap breach refuses that item and *continues*, so a cheap good item behind an
+expensive one stays reachable. Stopping at the first breach would silently reorder a
+buy list that was carefully ranked.
+
+A Hypothesis property covers the whole surface: no ordering of candidates and no prior
+spend can authorise more than the caps allow.
+
+### Idempotency
+
+The key is **derived** from venue and listing id, not random, so a retry recomputes the
+same key and is refused. A random key per attempt makes every retry look like a new
+purchase — the exact failure this prevents. Enforced by a UNIQUE index *and* checked
+within a batch, because a batch should not rely on an `IntegrityError` to notice its
+own duplicate. Attempt rows are written *before* the purchase, so a crash mid-purchase
+leaves a claimed key rather than nothing: the retry is blocked and a human looks.
+
+### What is deliberately not built
+
+**Purchase execution.** It stays unbuilt while P1 is open, and the rails would refuse
+it anyway. The dry-run harness exists as a command but is honest that it means nothing
+until real decisions accumulate — that is **P8**, and `arb provenance` tracks it.
+
+---
+
+## 22. The dashboard — provenance as the design brief
+
+**One self-contained HTML file. No server, no build step, no second runtime.** The
+source matrix proposed Next.js, Prisma and MongoDB for a read-only view over a local
+SQLite file — three runtimes to maintain for a page one person reads. `arb dashboard`
+writes a file you open. If an interactive UI ever earns its maintenance, the queries
+underneath it stay put.
+
+**The brief is provenance, so it is the design.** ROADMAP §5 requires that a margin
+computed from provisional fees and one computed from settlement data not look
+identical on screen. Colour therefore carries exactly one meaning and no decoration:
+**teal is measured, amber is assumed.** Every figure is marked where it is read, not
+disclaimed in a footnote.
+
+The register is a full section rather than an appendix. For a tool whose entire
+philosophy is refusing to present an estimate as a measurement, burying its own list
+of open assumptions would be a lie told by layout.
+
+Figures are monospace throughout — money in a ledger wants tabular alignment. Three
+properties are asserted rather than assumed: the page contains no `http(s)` and no
+`<script>`, and marketplace-supplied category ids are escaped.
+
+### Seeding cannot close a placeholder
+
+Every generated row is `synthetic=True`, and `provenance.gather` excludes synthetic
+rows from every count it takes. **Verified live: 40 seeded trades, P7 still open, 10
+of 10 open.** That property is what makes it safe to build a dashboard against
+generated data instead of waiting for the first real sale — the alternative is a
+dashboard nobody can develop, or one whose demo data quietly becomes its production
+data. A test also checks the exclusion is a *filter* and not a short circuit: a real
+settled sale alongside seed data still closes P7.
+
+The guard caught a `# noqa: S311` on a seeded RNG here. The fix was better than the
+suppression would have been: what this wants is **reproducibility, not randomness**, so
+values are derived from a hash of the row index. That also removes sequence state —
+seeding 20 rows and seeding 40 agree about the first 20, which a seeded RNG would not.
+
+### Verticals is the niche finder, and needed no new collection
+
+`category_id`, `country` and `favourites` have been on every listing since the first
+scan for exactly this. The table reads **margin against watchers**, because margin
+alone is half a picture: a high-margin niche with forty watchers per listing is one
+you lose races in.

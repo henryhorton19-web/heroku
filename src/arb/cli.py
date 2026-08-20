@@ -12,6 +12,7 @@ from datetime import timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated
 
+import apprise
 import typer
 from alembic import command
 from pydantic import ValidationError
@@ -19,14 +20,17 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 from arb import __version__
+from arb.autobuy import MAX_ARM_HOURS, MIN_ARM_HOURS, SpendCaps
 from arb.books.ledger import AGEING_DAYS, capital_position, ledger, totals
 from arb.books.reconcile import MIN_SETTLEMENTS, corrected_yaml, reconcile
 from arb.books.tax import TRADING_ALLOWANCE_PENCE, TaxYear, summarise_tax_year, tax_year_of
+from arb.books.verticals import seed_synthetic_trades, verticals
 from arb.comps.fees import load_fee_table
 from arb.comps.service import CompsResult, CompsService
 from arb.comps.soldcomps import SoldCompsClient
 from arb.config import Settings, get_settings
-from arb.db import VintedRef
+from arb.dashboard import DashboardData, render_dashboard
+from arb.db import AutobuyState, Inventory, VintedRef
 from arb.models import (
     ConditionBand,
     Decision,
@@ -35,9 +39,20 @@ from arb.models import (
     ListingDraft,
     ListingFilter,
     Valuation,
+    Venue,
     utcnow,
 )
 from arb.money import parse_pence, pence_to_decimal
+from arb.monitor import (
+    STALE_AFTER,
+    RunRecord,
+    RunStatus,
+    alert_body,
+    known_external_ids,
+    monitor_health,
+    new_candidates,
+    record_run,
+)
 from arb.pipeline import ScanDeps, ScanSettings, run_scan
 from arb.provenance import PlaceholderStatus, gather, resolve
 from arb.refdata import load_reference_data
@@ -51,6 +66,8 @@ from arb.sourcing.vinted import VintedBuyVenue, build_client
 from arb.store import alembic_config, make_engine, session_scope, upgrade_to_head
 
 if TYPE_CHECKING:
+    from sqlalchemy.orm import Session
+
     from arb.sourcing.scanner import ScanOutcome
 
 FEE_TABLE_DIR = Path(__file__).resolve().parent / "data" / "fees"
@@ -824,3 +841,373 @@ def tax(
         )
     typer.echo("")
     typer.echo("Figures to check with an accountant. Not a filing, and not tax advice.")
+
+
+monitor_app = typer.Typer(no_args_is_help=True, help="Watch searches for new stock.")
+app.add_typer(monitor_app, name="monitor")
+
+
+def _notify(settings: Settings, title: str, body: str) -> None:
+    """Send an alert, falling back to stdout.
+
+    Printing when no channel is configured is deliberate. A monitor whose notifier is
+    misconfigured must not fail silently -- that is the same silence as a quiet
+    market, which is the failure this whole subsystem is built to avoid.
+    """
+    url = settings.notify_url
+    if url is None:
+        typer.echo(f"[{title}] {body}")
+        return
+
+    notifier = apprise.Apprise()
+    if not notifier.add(url.get_secret_value()):
+        typer.echo(f"notify URL rejected by apprise; printing instead\n[{title}] {body}", err=True)
+        return
+    if not notifier.notify(title=title, body=body):
+        typer.echo(f"notify failed; printing instead\n[{title}] {body}", err=True)
+
+
+@monitor_app.command("run")
+def monitor_run(
+    query: Annotated[str, typer.Argument(help="What to watch Vinted for.")],
+    name: Annotated[str | None, typer.Option(help="Monitor name. Defaults to the query.")] = None,
+    limit: Annotated[int, typer.Option(help="Listings to fetch per poll.")] = 48,
+    max_price: Annotated[str | None, typer.Option(help="Cap, in pounds.")] = None,
+) -> None:
+    """Run one monitor pass: scan, diff against what we have seen, alert on what is new.
+
+    One pass, not a loop. Scheduling belongs to cron or a systemd timer, which already
+    handle restarts, overlap and backoff properly -- reimplementing that here would be
+    a worse version of something already installed on the machine.
+
+    A heartbeat row is written whether this succeeds or fails. Without it, a crashed
+    monitor and a quiet market are the same silence.
+    """
+    settings = get_settings()
+    monitor = name or query
+    started = utcnow()
+
+    if settings.soldcomps_api_key is None:
+        typer.echo("no ARB_SOLDCOMPS_API_KEY set -- cannot fetch comps", err=True)
+        raise typer.Exit(code=2)
+
+    fees = load_fee_table(FEE_TABLE_DIR / "ebay_uk.yaml")
+    listing_filter = ListingFilter(query=query, limit=limit, max_price_pence=parse_pence(max_price))
+    engine = make_engine(settings.db_url)
+
+    try:
+        with session_scope(engine) as session:
+            known = known_external_ids(session, Venue.VINTED)
+            service = CompsService(
+                SoldCompsClient(settings.soldcomps_api_key.get_secret_value()),
+                session,
+                freshness=timedelta(days=settings.comps_freshness_days),
+            )
+            outcome = run_scan(
+                ScanDeps(
+                    buy_venue=VintedBuyVenue(build_client(settings.vinted_base_url)),
+                    comps=service,
+                    fee_model=fees,
+                ),
+                listing_filter,
+                started,
+                ScanSettings(min_comp_n=settings.min_comp_n),
+            )
+            report = new_candidates(
+                outcome,
+                known,
+                monitor=monitor,
+                listings_seen=len(outcome.ranked) + len(outcome.rejected_quality),
+            )
+            for candidate in outcome.ranked:
+                listing_id = upsert_listing(session, candidate.listing)
+                write_opportunity(session, candidate.opportunity, listing_id=listing_id)
+            record_run(
+                session,
+                RunRecord(
+                    monitor=monitor,
+                    started_at=started,
+                    finished_at=utcnow(),
+                    status=RunStatus.OK,
+                    report=report,
+                ),
+            )
+    except (SQLAlchemyError, OSError, ValueError) as exc:
+        with session_scope(engine) as session:
+            record_run(
+                session,
+                RunRecord(
+                    monitor=monitor,
+                    started_at=started,
+                    finished_at=utcnow(),
+                    status=RunStatus.FAILED,
+                    error=str(exc)[:500],
+                ),
+            )
+        typer.echo(f"monitor {monitor} FAILED: {exc}", err=True)
+        raise typer.Exit(code=1) from None
+
+    typer.echo(f"{monitor}: {len(report.new_listings)} new, {len(report.alerts)} worth buying")
+    if report.has_alerts:
+        _notify(settings, f"arb: {monitor}", alert_body(report))
+
+
+@monitor_app.command("health")
+def monitor_health_cmd(
+    name: Annotated[str, typer.Argument(help="Monitor name.")],
+) -> None:
+    """Say whether a monitor is actually running.
+
+    Exits non-zero when stale, so a cron wrapper can alert on the monitor itself. A
+    monitor that has stopped and a market that has gone quiet produce identical
+    silence, and this is the only thing that tells them apart.
+    """
+    settings = get_settings()
+    engine = make_engine(settings.db_url)
+    with session_scope(engine) as session:
+        health = monitor_health(session, name, now=utcnow())
+
+    last = health.last_success.isoformat(timespec="seconds") if health.last_success else "never"
+    typer.echo(f"monitor           {health.monitor}")
+    typer.echo(f"last success      {last}")
+    typer.echo(
+        f"last status       {health.last_status.value if health.last_status else 'never ran'}"
+    )
+    typer.echo(f"failures in a row {health.consecutive_failures}")
+    if health.stale:
+        typer.echo(
+            f"STALE: nothing has succeeded within {STALE_AFTER}. Silence from this "
+            "monitor means nothing about the market.",
+            err=True,
+        )
+        raise typer.Exit(code=1)
+    typer.echo("healthy")
+
+
+autobuy_app = typer.Typer(no_args_is_help=True, help="Automated purchasing rails.")
+app.add_typer(autobuy_app, name="autobuy")
+
+
+def _autobuy_state(session: Session) -> AutobuyState:
+    """The single state row, created disarmed on first access. Fails closed."""
+    state = session.get(AutobuyState, 1)
+    if state is None:
+        state = AutobuyState(id=1, armed_until=None, kill_switch=False, updated_at=utcnow())
+        session.add(state)
+        session.flush()
+    return state
+
+
+def _fees_measured() -> bool:
+    """Read P1 from the same register `arb provenance` prints.
+
+    Consulted rather than duplicated: a second definition of 'are the fees real yet'
+    would drift from the first, and this is the one rail whose being wrong costs
+    money at machine speed.
+    """
+    settings = get_settings()
+    engine = make_engine(settings.db_url)
+    with session_scope(engine) as session:
+        state = gather(session, FEE_TABLE_DIR)
+    for entry in resolve(state):
+        if entry.placeholder.id == "P1":
+            return entry.status is PlaceholderStatus.CLOSED
+    return False
+
+
+@autobuy_app.command("arm")
+def autobuy_arm(
+    hours: Annotated[int, typer.Option(help="How long to stay armed.")] = 4,
+    note: Annotated[str | None, typer.Option(help="Why, for the audit trail.")] = None,
+) -> None:
+    """Arm AutoBuy for a bounded window.
+
+    An expiry rather than a flag, deliberately. AutoBuy requires periodic affirmative
+    action to keep running, so walking away from the machine stops it. A boolean would
+    stay true forever, which is exactly the state you do not want to find a fortnight
+    later.
+    """
+    if hours < MIN_ARM_HOURS or hours > MAX_ARM_HOURS:
+        typer.echo(f"refused: arm for between {MIN_ARM_HOURS} and {MAX_ARM_HOURS} hours", err=True)
+        raise typer.Exit(code=2)
+    settings = get_settings()
+    engine = make_engine(settings.db_url)
+    with session_scope(engine) as session:
+        state = _autobuy_state(session)
+        if state.kill_switch:
+            typer.echo(
+                "refused: the kill switch is engaged. Clear it explicitly with "
+                "`arb autobuy resume` before arming.",
+                err=True,
+            )
+            raise typer.Exit(code=2)
+        state.armed_until = utcnow() + timedelta(hours=hours)
+        state.updated_at = utcnow()
+        state.note = note
+        expiry = state.armed_until.isoformat(timespec="seconds")
+    typer.echo(f"armed until {expiry}")
+
+
+@autobuy_app.command("stop")
+def autobuy_stop(
+    note: Annotated[str | None, typer.Option(help="Why, for the audit trail.")] = None,
+) -> None:
+    """Engage the kill switch and disarm immediately."""
+    settings = get_settings()
+    engine = make_engine(settings.db_url)
+    with session_scope(engine) as session:
+        state = _autobuy_state(session)
+        state.kill_switch = True
+        state.armed_until = None
+        state.updated_at = utcnow()
+        state.note = note
+    typer.echo("STOPPED: kill switch engaged, AutoBuy disarmed")
+
+
+@autobuy_app.command("resume")
+def autobuy_resume() -> None:
+    """Clear the kill switch. Does not arm -- that stays a separate, deliberate act."""
+    settings = get_settings()
+    engine = make_engine(settings.db_url)
+    with session_scope(engine) as session:
+        state = _autobuy_state(session)
+        state.kill_switch = False
+        state.updated_at = utcnow()
+    typer.echo("kill switch cleared -- still disarmed, run `arb autobuy arm` to enable")
+
+
+@autobuy_app.command("status")
+def autobuy_status() -> None:
+    """Show every rail and whether it currently permits buying.
+
+    Exits non-zero when AutoBuy would refuse, so it can be used as a preflight.
+    """
+    settings = get_settings()
+    engine = make_engine(settings.db_url)
+    now = utcnow()
+    with session_scope(engine) as session:
+        state = _autobuy_state(session)
+        armed_until = state.armed_until
+        kill = state.kill_switch
+    fees_ok = _fees_measured()
+
+    armed = armed_until is not None and armed_until > now
+    armed_text = (
+        f"until {armed_until.isoformat(timespec='seconds')}"
+        if armed and armed_until is not None
+        else "no"
+    )
+    caps = SpendCaps()
+    typer.echo(f"kill switch    {'ENGAGED' if kill else 'clear'}")
+    typer.echo(f"armed          {armed_text}")
+    typer.echo(f"fees measured  {'yes' if fees_ok else 'NO -- P1 is open'}")
+    typer.echo(
+        f"caps           run {pence_to_decimal(caps.per_run_pence)} / "
+        f"day {pence_to_decimal(caps.per_day_pence)} / "
+        f"outstanding {pence_to_decimal(caps.outstanding_pence)}"
+    )
+
+    blocked = kill or not armed or not fees_ok
+    if blocked:
+        typer.echo("")
+        if not fees_ok:
+            typer.echo(
+                "AutoBuy is blocked: fees are still provisional. Automated spending "
+                "against invented rates repeats a mistake at machine speed. Run "
+                "`arb reconcile-fees` first.",
+                err=True,
+            )
+        else:
+            typer.echo("AutoBuy would refuse to buy right now.", err=True)
+        raise typer.Exit(code=1)
+    typer.echo("")
+    typer.echo("AutoBuy would permit buying")
+
+
+@autobuy_app.command("dryrun")
+def autobuy_dryrun(
+    limit: Annotated[int, typer.Option(help="Opportunities to consider.")] = 20,
+) -> None:
+    """Show what AutoBuy *would* buy from the current buy list, and why not otherwise.
+
+    Ignores the arm state on purpose -- a dry-run you have to arm for is one nobody
+    runs. Every other rail is applied exactly as it would be live, so the refusal
+    reasons here are the real ones.
+    """
+    settings = get_settings()
+    engine = make_engine(settings.db_url)
+    with session_scope(engine) as session:
+        rows = top_opportunities(session, limit=limit)
+    if not rows:
+        typer.echo("no opportunities scored yet -- run `arb scan` first")
+        return
+
+    typer.echo(f"{len(rows)} opportunities on the buy list")
+    typer.echo(f"fees measured: {'yes' if _fees_measured() else 'NO -- P1 open, would halt'}")
+    typer.echo("")
+    typer.echo("Dry-run is scored against recorded decisions, and means nothing until")
+    typer.echo("real ones accumulate -- that is P8. See `arb provenance`.")
+
+
+@app.command()
+def dashboard(
+    out: Annotated[Path, typer.Option(help="Where to write the page.")] = Path("books.html"),
+    fee_table: Annotated[str, typer.Option(help="Fee table for unsettled trades.")] = "ebay_uk",
+) -> None:
+    """Write a self-contained HTML view of the books.
+
+    One file, no server and no build step. It is a read-only view over a local SQLite
+    database, and three extra runtimes to render that would be maintenance without a
+    reader.
+
+    Every figure carries where it came from. A margin computed from settlement data
+    and one computed from fee rates nobody has checked are shown differently on
+    purpose -- and the open assumptions get a section of their own rather than a
+    footnote, because that is what the numbers above them depend on.
+    """
+    settings = get_settings()
+    table_path = FEE_TABLE_DIR / f"{fee_table}.yaml"
+    if not table_path.is_file():
+        typer.echo(f"no fee table at {table_path}", err=True)
+        raise typer.Exit(code=2)
+    fees = load_fee_table(table_path)
+
+    engine = make_engine(settings.db_url)
+    with session_scope(engine) as session:
+        synthetic = (
+            session.scalar(
+                select(func.count()).select_from(Inventory).where(Inventory.synthetic.is_(True))
+            )
+            or 0
+        )
+        data = DashboardData(
+            generated_at=utcnow(),
+            capital=capital_position(session, now=utcnow()),
+            trades=ledger(session, fees),
+            placeholders=resolve(gather(session, FEE_TABLE_DIR)),
+            verticals=verticals(session),
+            synthetic_trades=int(synthetic),
+        )
+
+    out.write_text(render_dashboard(data), encoding="utf-8")
+    typer.echo(f"wrote {out}")
+    if data.synthetic_trades:
+        typer.echo(f"note: {data.synthetic_trades} trades on this page are seeded, not traded")
+
+
+@app.command()
+def seed(
+    count: Annotated[int, typer.Option(help="How many trades to generate.")] = 40,
+) -> None:
+    """Generate synthetic trades so the books and dashboard have shape.
+
+    Every row is marked synthetic and is excluded from the placeholder register, so
+    seeding cannot make an assumption look measured. That is the property that makes
+    it safe to build a dashboard before the first real sale.
+    """
+    settings = get_settings()
+    engine = make_engine(settings.db_url)
+    with session_scope(engine) as session:
+        created = seed_synthetic_trades(session, now=utcnow(), count=count)
+    typer.echo(f"seeded {created} synthetic trades")
+    typer.echo("these cannot close a placeholder -- check with `arb provenance`")

@@ -14,7 +14,7 @@ keep one honest ledger. Python 3.12, SQLite, uv, mypy strict.
 valuation · fee model · comp matching · append-only comps cache · SoldComps adapter ·
 quality filter · contest-density filter · pure scanner · capital-velocity ranking ·
 Vinted read adapter · placeholder register · eBay taxonomy compliance gate ·
-`arb scan` / `buylist` / `decide` / `provenance` / `taxonomy` / `reconcile-fees` / `reprice` / `books` / `labels` / `tax`.
+`arb scan` / `buylist` / `decide` / `provenance` / `taxonomy` / `reconcile-fees` / `reprice` / `books` / `labels` / `tax` / `monitor` / `autobuy` / `dashboard` / `seed`.
 
 **To build:** sellside publishing, books, dashboard, automation, multi-venue. See
 `ROADMAP.md` §3–§7. All five workstreams are unblocked and can run in parallel.
@@ -161,13 +161,16 @@ src/arb/
   config.py         pydantic-settings, ARB_ prefix
   repo.py           listing upsert, opportunity write, decision write path
   provenance.py     the placeholder register, resolved against live state
+  monitor.py        seen-set diff around scan() · heartbeat · staleness
+  autobuy.py        purchase authorisation · caps · idempotency · dead-man switch
   pipeline.py       composes fetch → value → scan; all I/O at the edges
   refdata.py        Vinted ID table loader
   cli.py            typer
   comps/            fees · valuation · matching · cache · service · soldcomps
   sourcing/         quality · contest · rank · scanner · vinted · sweep
   selling/          taxonomy gate · aspect cache · settlement parsing · repricing · labels
-  books/            ledger, capital and ageing · fee reconciliation · UK tax year
+  books/            ledger, capital and ageing · reconciliation · UK tax · verticals
+  dashboard.py      self-contained HTML; colour encodes measured vs assumed
   data/fees/        versioned YAML fee tables
   migrations/       alembic
 tests/fixtures/     recorded payloads

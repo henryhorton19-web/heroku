@@ -45,6 +45,12 @@ class Settings(BaseSettings):
     vinted_requests_per_second: float = Field(default=1.5, gt=0.0, le=2.0)
     vinted_max_retries: int = Field(default=5, ge=0, le=10)
 
+    notify_url: SecretStr | None = None
+    """An apprise URL, e.g. `tgram://token/chatid` or a Slack webhook. Secret
+    because most of them embed a token. Absent means alerts print to stdout,
+    which is the right default: a monitor that fails to notify must not fail
+    silently, and printing is the one channel that always works."""
+
     comps_freshness_days: int = Field(default=7, ge=1, le=90)
     """How long a cached comps payload stays usable. Seven days trades a little
     staleness for roughly a 10x reduction in requests against a 100/month tier."""

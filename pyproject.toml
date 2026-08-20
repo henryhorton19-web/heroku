@@ -19,6 +19,7 @@ dependencies = [
     "vinted-api-wrapper>=0.3.9",
     "pdfplumber>=0.11.10",
     "pypdf>=6.16.1",
+    "apprise>=1.12.0",
 ]
 
 [project.scripts]
