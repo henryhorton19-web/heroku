@@ -5,7 +5,53 @@ from __future__ import annotations
 from unittest.mock import MagicMock, patch
 
 import pytest
-from engine.tls import TlsSession
+from engine.tls import TlsSession, detect_captcha
+
+
+class TestDetectCaptcha:
+    """Tests for detect_captcha helper."""
+
+    def test_turnstile_detected(self) -> None:
+        mock_resp = MagicMock()
+        mock_resp.text = (
+            '<div class="cf-turnstile" data-sitekey="0x4AAAAAAA"></div>'
+        )
+        result = detect_captcha(mock_resp)
+        assert result is not None
+        assert result[0] == "turnstile"
+        assert result[1] == "0x4AAAAAAA"
+
+    def test_hcaptcha_detected(self) -> None:
+        mock_resp = MagicMock()
+        mock_resp.text = (
+            '<div class="h-captcha" data-sitekey="abc-def"></div>'
+        )
+        result = detect_captcha(mock_resp)
+        assert result is not None
+        assert result[0] == "hcaptcha"
+        assert result[1] == "abc-def"
+
+    def test_recaptcha_detected(self) -> None:
+        mock_resp = MagicMock()
+        mock_resp.text = (
+            '<div class="g-recaptcha" data-sitekey="6Lc..."></div>'
+        )
+        result = detect_captcha(mock_resp)
+        assert result is not None
+        assert result[0] == "recaptcha"
+        assert result[1] == "6Lc..."
+
+    def test_no_captcha(self) -> None:
+        mock_resp = MagicMock()
+        mock_resp.text = "<html><body>No challenge here</body></html>"
+        result = detect_captcha(mock_resp)
+        assert result is None
+
+    def test_none_text(self) -> None:
+        mock_resp = MagicMock()
+        mock_resp.text = None
+        result = detect_captcha(mock_resp)
+        assert result is None
 
 
 class TestTlsSession:

@@ -54,6 +54,7 @@ class EngineSettings(BaseSettings):
 
     # AutoCop (future)
     autocop_enabled: bool = False
+    autocop_max_spend_pence: int = 5000
 
     # Cross-lister (future)
     crosslister_enabled: bool = False
