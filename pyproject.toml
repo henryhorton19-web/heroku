@@ -20,6 +20,7 @@ dependencies = [
     "pdfplumber>=0.11.10",
     "pypdf>=6.16.1",
     "apprise>=1.12.0",
+    "curl-cffi>=0.16.0",
 ]
 
 [project.scripts]
@@ -34,6 +35,7 @@ dev = [
     "hypothesis>=6.122",
     "respx>=0.22",
     "types-pyyaml>=6.0.12.20260815",
+    "pytest-asyncio>=1.4.0",
 ]
 
 [build-system]
@@ -65,6 +67,11 @@ ignore = [
 [tool.ruff.lint.per-file-ignores]
 # Tests assert, use magic numbers, and touch privates deliberately.
 "tests/**" = ["S101", "PLR2004", "SLF001", "ANN401"]
+"tests_engine/**" = ["S101", "PLR2004", "SLF001", "ANN401", "ARG001", "SIM105", "SIM117", "TC003"]
+"engine/**" = ["EM101", "EM102", "TRY003", "ANN401", "TC001", "TC002", "TC003", "RUF001", "RUF046", "SIM108", "ERA001", "C901", "BLE001", "PLR2004", "T201"]
+
+
+
 # Alembic generates this shape; revision identifiers are module-level constants.
 "src/arb/migrations/**" = ["INP001", "N999"]
 # Typer resolves annotations at runtime via inspect.get_annotations, so moving these
@@ -103,7 +110,9 @@ files = ["src", "tests", "scripts"]
 [tool.pytest.ini_options]
 addopts = "-q --strict-markers --strict-config --cov=arb --cov-report=term-missing --cov-fail-under=85"
 testpaths = ["tests"]
+markers = ["asyncio: mark test as async"]
 filterwarnings = ["error"]
+
 
 [tool.coverage.run]
 branch = true
@@ -115,3 +124,8 @@ omit = ["src/arb/migrations/*"]
 # wrapper touches exactly one function (arb.sourcing.vinted.build_client).
 module = "vinted.*"
 ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "curl_cffi.*"
+ignore_missing_imports = true
+
