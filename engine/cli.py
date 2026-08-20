@@ -5,6 +5,8 @@ Usage::
     uv run python -m engine.cli monitor --keyword "nike air max"
     uv run python -m engine.cli monitor --keyword "adidas" --max-price 25.00
     uv run python -m engine.cli autocop --listing-id "12345" --title "Nike Air Max" --price-pence 4500
+    uv run python -m engine.cli delist --inventory-id "inv-1" --venue "vinted" --external-id "ext-1"
+    uv run python -m engine.cli adspower-status
 """
 
 from __future__ import annotations
@@ -13,9 +15,11 @@ import asyncio
 
 import typer
 
+from engine.adspower import AdsPowerClient
 from engine.autocop import attempt_checkout
 from engine.captcha import CaptchaSolver
 from engine.config import get_engine_settings
+from engine.crosslister import delist_item
 from engine.monitor import MonitorConfig, run_monitor_loop
 from engine.proxy import ProxyPool
 from engine.tls import TlsSession
@@ -124,6 +128,65 @@ def autocop(
         typer.echo("\nAutoCop stopped by user.")
     finally:
         tls_session.close()
+
+
+@app.command()
+def delist(
+    inventory_id: str = typer.Argument(..., help="Internal inventory identifier."),
+    venue: str = typer.Argument(..., help="Venue name (vinted, ebay, depop, poshmark, mercari)."),
+    external_id: str = typer.Argument(..., help="External listing identifier on the venue."),
+) -> None:
+    """Immediately delist an item on the given venue."""
+    settings = get_engine_settings()
+    if not settings.enabled:
+        typer.echo(
+            "Engine is disabled. Set ENGINE_ENABLED=true in your environment or .env file.",
+            err=True,
+        )
+        raise typer.Exit(1)
+
+    tls_session = TlsSession(preset=settings.tls_preset)
+    try:
+        proxy_pool = ProxyPool.from_env()
+    except Exception as exc:
+        typer.echo(f"Failed to load proxy pool: {exc}", err=True)
+        raise typer.Exit(1) from exc
+
+    async def run() -> None:
+        result = await delist_item(
+            inventory_id=inventory_id,
+            venue=venue,
+            external_id=external_id,
+            tls_session=tls_session,
+            proxy_pool=proxy_pool,
+        )
+        if result.success:
+            typer.echo(f"Delist succeeded for {venue}:{external_id}")
+        else:
+            typer.echo(f"Delist failed: {result.error}", err=True)
+            raise typer.Exit(1)
+
+    try:
+        asyncio.run(run())
+    except KeyboardInterrupt:
+        typer.echo("\nDelist stopped by user.")
+    finally:
+        tls_session.close()
+
+
+@app.command()
+def adspower_status() -> None:
+    """Show AdsPower connection status and list profiles (stub)."""
+    settings = get_engine_settings()
+    if not settings.enabled:
+        typer.echo(
+            "Engine is disabled. Set ENGINE_ENABLED=true in your environment or .env file.",
+            err=True,
+        )
+        raise typer.Exit(1)
+
+    typer.echo(f"AdsPower API URL: {settings.adspower_api_url}")
+    typer.echo("Status: stub – real profile listing not yet implemented.")
 
 
 # ---------------------------------------------------------------------------
