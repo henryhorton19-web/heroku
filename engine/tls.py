@@ -107,8 +107,7 @@ class TlsSession:
     def __init__(self, preset: ImpersonationPreset = "chrome120") -> None:
         _validate_preset(preset)
         self._preset = preset
-        self._session: curl_requests.Session = curl_requests.Session()
-        self._session.impersonate = preset  # type: ignore[attr-defined]
+        self._session: curl_requests.Session = curl_requests.Session(impersonate=preset)
 
     # ------------------------------------------------------------------
     # Public methods
@@ -148,14 +147,17 @@ class TlsSession:
             detected = detect_captcha(resp)
             if detected is not None:
                 captcha_type, site_key = detected
-                # Solve
+                # Solve – note: captcha_solver methods are async, but this
+                # method is sync.  We use asyncio.run() to bridge.
+                import asyncio  # noqa: PLC0415 – import inside method to avoid top-level import
+
                 try:
                     if captcha_type == "turnstile":
-                        result = captcha_solver.solve_turnstile(site_key, url)
+                        result = asyncio.run(captcha_solver.solve_turnstile(site_key, url))
                     elif captcha_type == "hcaptcha":
-                        result = captcha_solver.solve_hcaptcha(site_key, url)
+                        result = asyncio.run(captcha_solver.solve_hcaptcha(site_key, url))
                     elif captcha_type == "recaptcha":
-                        result = captcha_solver.solve_recaptcha(site_key, url)
+                        result = asyncio.run(captcha_solver.solve_recaptcha(site_key, url))
                     else:
                         return resp
                 except Exception:

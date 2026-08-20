@@ -11,7 +11,7 @@ runner = CliRunner()
 def test_engine_monitor_disabled() -> None:
     with patch("engine.cli.get_engine_settings") as mock_settings:
         mock_settings.return_value.enabled = False
-        result = runner.invoke(engine_app, ["--keyword", "nike"])
+        result = runner.invoke(engine_app, ["monitor", "--keyword", "nike"])
         assert result.exit_code == 1
 
 
@@ -24,5 +24,5 @@ def test_engine_monitor_enabled() -> None:
     ):
         mock_settings.return_value.enabled = True
         mock_settings.return_value.tls_preset = "chrome120"
-        result = runner.invoke(engine_app, ["--keyword", "nike", "--max-price", "20.0"])
+        result = runner.invoke(engine_app, ["monitor", "--keyword", "nike", "--max-price", "20.0"])
         assert result.exit_code == 0
