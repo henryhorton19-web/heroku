@@ -1,0 +1,28 @@
+{
+  "_comment": "Copy to ebay_rest.json. Gitignored. Shape per matecsaj/ebay_rest.",
+  "applications": {
+    "production_1": {
+      "app_id": "REPLACE",
+      "cert_id": "REPLACE",
+      "dev_id": "REPLACE",
+      "redirect_uri": "REPLACE"
+    }
+  },
+  "users": {
+    "production_1": {
+      "email_or_username": "REPLACE",
+      "password": "REPLACE",
+      "refresh_token": "REPLACE",
+      "refresh_token_expiry": "REPLACE"
+    }
+  },
+  "headers": {
+    "production_1": {
+      "accept_language": "en-GB",
+      "content_language": "en-GB",
+      "country": "GB",
+      "currency": "GBP",
+      "marketplace_id": "EBAY_GB"
+    }
+  }
+}

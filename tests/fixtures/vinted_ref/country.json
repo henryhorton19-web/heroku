@@ -1,0 +1,41 @@
+[
+ {
+  "id": 16,
+  "title": "France",
+  "title_local": "France",
+  "iso_code": "FR",
+  "postal_code_constraints": {
+   "max_length": 5,
+   "min_length": 5,
+   "keyboard_input_type": "pad",
+   "format": "^\\d{5}$",
+   "blacklist_regex": null
+  }
+ },
+ {
+  "id": 19,
+  "title": "Belgique",
+  "title_local": "Belgique / België",
+  "iso_code": "BE",
+  "postal_code_constraints": {
+   "max_length": 4,
+   "min_length": 4,
+   "keyboard_input_type": "pad",
+   "format": "^\\d{4}$",
+   "blacklist_regex": null
+  }
+ },
+ {
+  "id": 7,
+  "title": "Espagne",
+  "title_local": "España",
+  "iso_code": "ES",
+  "postal_code_constraints": {
+   "max_length": 5,
+   "min_length": 5,
+   "keyboard_input_type": "pad",
+   "format": "^\\d{5}$",
+   "blacklist_regex": "\\A(35|38|52|51)"
+  }
+ }
+]

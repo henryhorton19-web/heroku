@@ -1,0 +1,115 @@
+[
+ {
+  "id": 4,
+  "caption_code": 10,
+  "caption": "Taille",
+  "description": "Tailles",
+  "size_ids": [
+   2,
+   3,
+   4,
+   5,
+   6,
+   7,
+   90,
+   97,
+   102,
+   310,
+   311,
+   312,
+   1226,
+   1227,
+   1228,
+   1229,
+   1230
+  ],
+  "faq_entry_id": 506,
+  "sizes": [
+   {
+    "id": 1226,
+    "title": "XXXS / 30 / 2",
+    "is_default": 0,
+    "is_other": 0,
+    "order": 0
+   },
+   {
+    "id": 102,
+    "title": "XXS / 32 / 4",
+    "is_default": 0,
+    "is_other": 0,
+    "order": 2
+   },
+   {
+    "id": 2,
+    "title": "XS / 34 / 6",
+    "is_default": 0,
+    "is_other": 0,
+    "order": 4
+   },
+   {
+    "id": 3,
+    "title": "S / 36 / 8",
+    "is_default": 0,
+    "is_other": 0,
+    "order": 6
+   }
+  ]
+ },
+ {
+  "id": 7,
+  "caption_code": 10,
+  "caption": "Taille",
+  "description": "Chaussures",
+  "size_ids": [
+   55,
+   56,
+   57,
+   58,
+   59,
+   60,
+   61,
+   62,
+   63,
+   94,
+   99,
+   1195,
+   1196,
+   1197,
+   1198,
+   1199,
+   1200,
+   1201
+  ],
+  "faq_entry_id": 510,
+  "sizes": [
+   {
+    "id": 55,
+    "title": "35",
+    "is_default": 0,
+    "is_other": 0,
+    "order": 1
+   },
+   {
+    "id": 1195,
+    "title": "35.5",
+    "is_default": 0,
+    "is_other": 0,
+    "order": 2
+   },
+   {
+    "id": 56,
+    "title": "36",
+    "is_default": 0,
+    "is_other": 0,
+    "order": 3
+   },
+   {
+    "id": 1196,
+    "title": "36.5",
+    "is_default": 0,
+    "is_other": 0,
+    "order": 4
+   }
+  ]
+ }
+]

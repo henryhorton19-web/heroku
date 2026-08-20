@@ -1,0 +1,103 @@
+[project]
+name = "arb"
+version = "0.1.0"
+description = "Personal reselling tool: Vinted buy-side, eBay sell-side, one ledger."
+requires-python = ">=3.12"
+
+# Step 0 runtime deps only (components 9-13 of the build plan).
+# Later steps add their own; SPEC.md records which step adds what.
+dependencies = [
+    "sqlalchemy>=2.0.36",
+    "alembic>=1.14",
+    "pydantic>=2.10",
+    "pydantic-settings>=2.7",
+    "typer>=0.15",
+    "httpx>=0.28",
+    "tenacity>=9.0",
+]
+
+[project.scripts]
+arb = "arb.cli:app"
+
+[dependency-groups]
+dev = [
+    "ruff>=0.8",
+    "mypy>=1.14",
+    "pytest>=8.3",
+    "pytest-cov>=6.0",
+    "hypothesis>=6.122",
+    "respx>=0.22",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/arb"]
+
+# ---------------------------------------------------------------- ruff
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+# Deliberately broad. CONTEXT.md 4.7: never weaken the gate to make something pass.
+select = [
+    "A", "ANN", "ARG", "B", "BLE", "C4", "C90", "COM", "DTZ", "E", "EM", "ERA",
+    "F", "FBT", "FLY", "FURB", "I", "ICN", "INP", "ISC", "LOG", "N", "PERF",
+    "PGH", "PIE", "PL", "PT", "PTH", "Q", "RET", "RSE", "RUF", "S", "SIM",
+    "SLF", "T20", "TC", "TID", "TRY", "UP", "W",
+]
+ignore = [
+    "COM812", # conflicts with ruff format
+    "ISC001", # conflicts with ruff format
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests assert, use magic numbers, and touch privates deliberately.
+"tests/**" = ["S101", "PLR2004", "SLF001", "ANN401"]
+# Alembic generates this shape; revision identifiers are module-level constants.
+"src/arb/migrations/**" = ["INP001", "N999"]
+# Typer resolves annotations at runtime via inspect.get_annotations, so moving these
+# imports into a TYPE_CHECKING block raises NameError at import. Verified, not assumed.
+"src/arb/cli.py" = ["TC003"]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 8
+
+[tool.ruff.lint.flake8-type-checking]
+runtime-evaluated-base-classes = ["pydantic.BaseModel", "arb.db.Base"]
+
+# ---------------------------------------------------------------- mypy
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_unreachable = true
+warn_unused_ignores = true
+# disallow_any_explicit is deliberately NOT set. It fires on every `class X(BaseModel)`
+# because pydantic synthesises `__init__(**data: Any)`, so it flags the library rather
+# than our code and would need an override on nearly every module. The intent -- no
+# hand-written `Any` in authored source -- is enforced by scripts/guard.py instead,
+# which is a mechanism that actually works against this dependency list.
+disallow_any_generics = true
+no_implicit_reexport = true
+enable_error_code = [
+    "redundant-expr",
+    "truthy-bool",
+    "ignore-without-code",
+    "possibly-undefined",
+    "explicit-override",
+]
+files = ["src", "tests", "scripts"]
+
+# ---------------------------------------------------------------- pytest
+[tool.pytest.ini_options]
+addopts = "-q --strict-markers --strict-config --cov=arb --cov-report=term-missing --cov-fail-under=85"
+testpaths = ["tests"]
+filterwarnings = ["error"]
+
+[tool.coverage.run]
+branch = true
+omit = ["src/arb/migrations/*"]

@@ -1,0 +1,59 @@
+# The gate. CONTEXT.md 4.7: most code here is agent-written and will not be reviewed
+# line by line, so quality rests on this being deterministic and un-bypassable.
+# Never weaken a step to make something pass. If a rule genuinely cannot be satisfied,
+# stop and escalate.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Sync (locked)
+        run: uv sync --frozen --all-extras
+
+      - name: Lint
+        run: uv run ruff check .
+
+      - name: Format
+        run: uv run ruff format --check .
+
+      - name: Types
+        run: uv run mypy
+
+      - name: Guard (suppressions, authored Any, line budget, secret hygiene)
+        run: uv run python scripts/guard.py
+
+      - name: Tests
+        run: uv run pytest
+
+      - name: Migrations apply from empty
+        # Catches a migration that only works against a database that already exists.
+        run: |
+          rm -f ci.db
+          ARB_DB_PATH=ci.db uv run arb db upgrade
+          ARB_DB_PATH=ci.db uv run arb doctor
+
+      - name: Lockfile is current
+        run: |
+          uv lock --check

@@ -1,0 +1,23 @@
+# Never committed. The repo is public; this is not a soft rule.
+.env
+ebay_rest.json
+arb.db
+arb.db-wal
+arb.db-shm
+
+# Reference data is cloned, not vendored
+data/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.hypothesis/
+.coverage
+htmlcov/
+dist/
+build/
+*.egg-info/

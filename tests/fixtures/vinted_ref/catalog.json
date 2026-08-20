@@ -1,0 +1,106 @@
+[
+ {
+  "id": 1904,
+  "title": "Femmes",
+  "code": "WOMEN_ROOT",
+  "item_count": 228287958,
+  "catalogs": [
+   {
+    "id": 4,
+    "title": "Vêtements",
+    "code": "WOMENS",
+    "item_count": 175637994,
+    "catalogs": [
+     {
+      "id": 1037,
+      "title": "Manteaux & vestes",
+      "code": "COATS_JACKETS",
+      "item_count": 17838629,
+      "catalogs": []
+     },
+     {
+      "id": 13,
+      "title": "Sweats & sweats à capuche",
+      "code": "PULLOVERS_SWEATERS",
+      "item_count": 19356257,
+      "catalogs": []
+     }
+    ]
+   },
+   {
+    "id": 16,
+    "title": "Chaussures",
+    "code": "FOOTWEAR",
+    "item_count": 23845010,
+    "catalogs": [
+     {
+      "id": 1049,
+      "title": "Bottes",
+      "code": "W_BOOTS",
+      "item_count": 2119325,
+      "catalogs": []
+     },
+     {
+      "id": 543,
+      "title": "Chaussures à talons",
+      "code": "HIGH_HEELS",
+      "item_count": 7922361,
+      "catalogs": []
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": 5,
+  "title": "Hommes",
+  "code": "MENS",
+  "item_count": 36817754,
+  "catalogs": [
+   {
+    "id": 2050,
+    "title": "Vêtements",
+    "code": "MEN_CLOTHING",
+    "item_count": 29653718,
+    "catalogs": [
+     {
+      "id": 257,
+      "title": "Jeans",
+      "code": "MEN_TRO_JEANS",
+      "item_count": 2529301,
+      "catalogs": []
+     },
+     {
+      "id": 1206,
+      "title": "Manteaux & vestes",
+      "code": "MEN_OUTERWEAR_NEW",
+      "item_count": 4506558,
+      "catalogs": []
+     }
+    ]
+   },
+   {
+    "id": 1231,
+    "title": "Chaussures",
+    "code": "MEN_SHOES_NEW",
+    "item_count": 3660292,
+    "catalogs": [
+     {
+      "id": 2053,
+      "title": "Richelieu & Mocassins",
+      "code": "MEN_OXFORDS_LOAFERS",
+      "item_count": 328988,
+      "catalogs": []
+     },
+     {
+      "id": 2054,
+      "title": "Chaussons & Tongs",
+      "code": "MEN_SLIPPERS_FLIPFLOPS",
+      "item_count": 56025,
+      "catalogs": []
+     }
+    ]
+   }
+  ]
+ }
+]

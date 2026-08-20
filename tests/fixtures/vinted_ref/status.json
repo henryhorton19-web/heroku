@@ -1,0 +1,47 @@
+[
+ {
+  "id": 6,
+  "title": "Neuf avec étiquette",
+  "description": "Article neuf, jamais porté/utilisé avec étiquettes ou dans son emballage d’origine.",
+  "explanation": "Article neuf, jamais porté/utilisé avec étiquettes ou dans son emballage d’origine.",
+  "explanation_title": "Cet article est flambant neuf ?",
+  "is_default": 0,
+  "order": 5
+ },
+ {
+  "id": 1,
+  "title": "Neuf sans étiquette",
+  "description": "Article neuf, jamais porté/utilisé, sans étiquettes ni emballage d’origine.",
+  "explanation": "Article neuf, jamais porté/utilisé, sans étiquettes ni emballage d’origine.",
+  "explanation_title": "L’article n’a plus d’étiquette, mais il n’a jamais été porté ?",
+  "is_default": 0,
+  "order": 10
+ },
+ {
+  "id": 2,
+  "title": "Très bon état",
+  "description": "Un article très peu porté/utilisé qui peut avoir de légères imperfections, mais qui reste en très bon état. Précise avec des photos et une description détaillée, les défauts de ton article.",
+  "explanation": "Un article très peu porté/utilisé qui peut avoir de légères imperfections, mais qui reste en très bon état. Précise avec des photos et une description détaillée, les défauts de ton article.",
+  "explanation_title": "L’article a déjà été porté mais n’a pas de défaut apparent ?",
+  "is_default": 1,
+  "order": 20
+ },
+ {
+  "id": 3,
+  "title": "Bon état",
+  "description": "Un article porté/utilisé quelques fois, montre des imperfections et des signes d’usure. Précise avec des photos et une description détaillée, les défauts de ton article.",
+  "explanation": "Un article porté/utilisé quelques fois, montre des imperfections et des signes d’usure. Précise avec des photos et une description détaillée, les défauts de ton article.",
+  "explanation_title": "Cet article a de légers défauts ?",
+  "is_default": 0,
+  "order": 30
+ },
+ {
+  "id": 4,
+  "title": "Satisfaisant",
+  "description": "Un article porté/utilisé plusieurs fois, montre des imperfections et des signes d’usure. Précise avec des photos et une description détaillée, les défauts de ton article.",
+  "explanation": "Un article porté/utilisé plusieurs fois, montre des imperfections et des signes d’usure. Précise avec des photos et une description détaillée, les défauts de ton article.",
+  "explanation_title": "L’article a un ou plusieurs défauts ?",
+  "is_default": 0,
+  "order": 40
+ }
+]
