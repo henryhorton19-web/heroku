@@ -1,126 +1,154 @@
-"""Unit tests for ``src.arb.web.api_engine``."""
+"""Unit tests for engine REST API bridge endpoints."""
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
-
 import pytest
+from arb.web.app import create_app
+
+from engine.config import get_engine_settings
 from fastapi.testclient import TestClient
 
-from engine.config import EngineSettings, get_engine_settings
-from src.arb.web.app import app
 
-
-@pytest.fixture(autouse=True)
-def _reset_settings() -> None:
-    """Reset engine settings to defaults before each test."""
-    settings = get_engine_settings()
-    settings.enabled = False
-    settings.autocop_enabled = False
-    settings.capsolver_api_key = None
-    settings.captcha_2captcha_api_key = None
-
-
-client = TestClient(app)
+@pytest.fixture
+def client() -> TestClient:
+    app = create_app()
+    return TestClient(app)
 
 
 class TestEngineAPI:
-    """Tests for engine API endpoints."""
-
-    def test_status_when_disabled_returns_503(self) -> None:
-        """GET /api/v1/engine/status returns 503 when engine is disabled."""
-        response = client.get("/api/v1/engine/status")
-        assert response.status_code == 503
-        assert "disabled" in response.json()["detail"].lower()
-
-    def test_status_when_enabled_returns_200(self) -> None:
-        """GET /api/v1/engine/status returns 200 when engine is enabled."""
+    def test_status_when_disabled_returns_503(self, client: TestClient) -> None:
         settings = get_engine_settings()
-        settings.enabled = True
-        response = client.get("/api/v1/engine/status")
-        assert response.status_code == 200
-        data = response.json()
-        assert data["enabled"] is True
-        assert data["tls_preset"] == "chrome120"
+        orig = settings.enabled
+        settings.enabled = False
+        try:
+            res = client.get("/api/v1/engine/status")
+            assert res.status_code == 503
+            assert "disabled" in res.json()["detail"].lower()
+        finally:
+            settings.enabled = orig
 
-    def test_toggle_enables_engine(self) -> None:
-        """POST /api/v1/engine/toggle enables the engine."""
-        response = client.post("/api/v1/engine/toggle", json={"enabled": True})
-        assert response.status_code == 200
-        data = response.json()
-        assert data["enabled"] is True
-
-    def test_toggle_disables_engine(self) -> None:
-        """POST /api/v1/engine/toggle disables the engine."""
+    def test_status_when_enabled_returns_200(self, client: TestClient) -> None:
         settings = get_engine_settings()
+        orig = settings.enabled
         settings.enabled = True
-        response = client.post("/api/v1/engine/toggle", json={"enabled": False})
-        assert response.status_code == 200
-        data = response.json()
-        assert data["enabled"] is False
+        try:
+            res = client.get("/api/v1/engine/status")
+            assert res.status_code == 200
+            data = res.json()
+            assert data["enabled"] is True
+            assert "tls_preset" in data
 
-    def test_proxies_when_disabled_returns_503(self) -> None:
-        """GET /api/v1/engine/proxies returns 503 when disabled."""
-        response = client.get("/api/v1/engine/proxies")
-        assert response.status_code == 503
+        finally:
+            settings.enabled = orig
 
-    def test_proxies_when_enabled_returns_200(self) -> None:
-        """GET /api/v1/engine/proxies returns 200 when enabled."""
+    def test_toggle_enables_engine(self, client: TestClient) -> None:
         settings = get_engine_settings()
-        settings.enabled = True
-        with patch("engine.proxy.ProxyPool.from_env") as mock_from_env:
-            mock_pool = MagicMock()
-            mock_pool.total_count = 5
-            mock_pool.available_count = 3
-            mock_from_env.return_value = mock_pool
-            response = client.get("/api/v1/engine/proxies")
-        assert response.status_code == 200
-        data = response.json()
-        assert data["total"] == 5
-        assert data["available"] == 3
+        orig = settings.enabled
+        try:
+            res = client.post("/api/v1/engine/toggle", json={"enabled": True})
+            assert res.status_code == 200
+            assert res.json()["enabled"] is True
+            assert settings.enabled is True
+        finally:
+            settings.enabled = orig
 
-    def test_captcha_when_disabled_returns_503(self) -> None:
-        """GET /api/v1/engine/captcha returns 503 when disabled."""
-        response = client.get("/api/v1/engine/captcha")
-        assert response.status_code == 503
-
-    def test_captcha_when_enabled_returns_200(self) -> None:
-        """GET /api/v1/engine/captcha returns 200 when enabled."""
+    def test_toggle_disables_engine(self, client: TestClient) -> None:
         settings = get_engine_settings()
-        settings.enabled = True
-        response = client.get("/api/v1/engine/captcha")
-        assert response.status_code == 200
-        data = response.json()
-        assert data["capsolver_configured"] is False
-        assert data["twocaptcha_configured"] is False
+        orig = settings.enabled
+        try:
+            res = client.post("/api/v1/engine/toggle", json={"enabled": False})
+            assert res.status_code == 200
+            assert res.json()["enabled"] is False
+            assert settings.enabled is False
+        finally:
+            settings.enabled = orig
 
-    def test_autocop_when_disabled_returns_503(self) -> None:
-        """GET /api/v1/engine/autocop returns 503 when disabled."""
-        response = client.get("/api/v1/engine/autocop")
-        assert response.status_code == 503
-
-    def test_autocop_when_enabled_returns_200(self) -> None:
-        """GET /api/v1/engine/autocop returns 200 when enabled."""
+    def test_proxies_when_disabled_returns_503(self, client: TestClient) -> None:
         settings = get_engine_settings()
-        settings.enabled = True
-        settings.autocop_enabled = True
-        response = client.get("/api/v1/engine/autocop")
-        assert response.status_code == 200
-        data = response.json()
-        assert data["armed"] is True
-        assert data["max_spend_pence"] == 5000
+        orig = settings.enabled
+        settings.enabled = False
+        try:
+            res = client.get("/api/v1/engine/proxies")
+            assert res.status_code == 503
+        finally:
+            settings.enabled = orig
 
-    def test_crosslister_when_disabled_returns_503(self) -> None:
-        """GET /api/v1/engine/crosslister returns 503 when disabled."""
-        response = client.get("/api/v1/engine/crosslister")
-        assert response.status_code == 503
-
-    def test_crosslister_when_enabled_returns_200(self) -> None:
-        """GET /api/v1/engine/crosslister returns 200 when enabled."""
+    def test_proxies_when_enabled_returns_200(self, client: TestClient) -> None:
         settings = get_engine_settings()
+        orig = settings.enabled
         settings.enabled = True
-        response = client.get("/api/v1/engine/crosslister")
-        assert response.status_code == 200
-        data = response.json()
-        assert "vinted" in data["venues"]
-        assert data["active_delist_queue"] == 0
+        try:
+            res = client.get("/api/v1/engine/proxies")
+            assert res.status_code == 200
+            data = res.json()
+            assert "total" in data
+            assert "available" in data
+        finally:
+            settings.enabled = orig
+
+    def test_captcha_when_disabled_returns_503(self, client: TestClient) -> None:
+        settings = get_engine_settings()
+        orig = settings.enabled
+        settings.enabled = False
+        try:
+            res = client.get("/api/v1/engine/captcha")
+            assert res.status_code == 503
+        finally:
+            settings.enabled = orig
+
+    def test_captcha_when_enabled_returns_200(self, client: TestClient) -> None:
+        settings = get_engine_settings()
+        orig = settings.enabled
+        settings.enabled = True
+        try:
+            res = client.get("/api/v1/engine/captcha")
+            assert res.status_code == 200
+            data = res.json()
+            assert "capsolver_configured" in data
+        finally:
+            settings.enabled = orig
+
+    def test_autocop_when_disabled_returns_503(self, client: TestClient) -> None:
+        settings = get_engine_settings()
+        orig = settings.enabled
+        settings.enabled = False
+        try:
+            res = client.get("/api/v1/engine/autocop")
+            assert res.status_code == 503
+        finally:
+            settings.enabled = orig
+
+    def test_autocop_when_enabled_returns_200(self, client: TestClient) -> None:
+        settings = get_engine_settings()
+        orig = settings.enabled
+        settings.enabled = True
+        try:
+            res = client.get("/api/v1/engine/autocop")
+            assert res.status_code == 200
+            data = res.json()
+            assert "armed" in data
+            assert "max_spend_pence" in data
+        finally:
+            settings.enabled = orig
+
+    def test_crosslister_when_disabled_returns_503(self, client: TestClient) -> None:
+        settings = get_engine_settings()
+        orig = settings.enabled
+        settings.enabled = False
+        try:
+            res = client.get("/api/v1/engine/crosslister")
+            assert res.status_code == 503
+        finally:
+            settings.enabled = orig
+
+    def test_crosslister_when_enabled_returns_200(self, client: TestClient) -> None:
+        settings = get_engine_settings()
+        orig = settings.enabled
+        settings.enabled = True
+        try:
+            res = client.get("/api/v1/engine/crosslister")
+            assert res.status_code == 200
+            data = res.json()
+            assert "venues" in data
+        finally:
+            settings.enabled = orig

@@ -211,3 +211,51 @@
 
 # 2026-08-20 16:41:17.359463
 +Y
+
+# 2026-08-20 17:04:26.506485
++Shadow, please proceed with Phase 6: Engine Hardening, REST API Bridge & Frontend Web UI Integration.
++
++STRICT LANGUAGE & MERGE RULES FOR SHADOW:
++- DO NOT speak, respond, or write in Dutch under any circumstances. ALL chat responses, code, comments, docstrings, and CLI output MUST be in ENGLISH.
++- Build the REST API Bridge endpoints under `src/arb/web/api_engine.py` (or `engine/web_bridge.py`) so Horse's FastAPI server (`src/arb/web/app.py`) can serve engine telemetry and controls.
++- Update Horse's frontend static files (`src/arb/web/static/index.html`, `app.css`, `app.js`) to add an interactive "Engine Stealth Control Center" tab.
++- Move `engine/` modules to `src/arb/engine/` and `tests_engine/` to `tests/test_engine_*.py` for seamless package integration.
++
++---
++
++Phase 6 Action Items:
++
++1. REST API Bridge Endpoints (`src/arb/web/api_engine.py`):
++   - `GET /api/v1/engine/status`: Returns `ENGINE_ENABLED` state, active TLS preset (`chrome120`/`firefox122`), sub-millisecond polling latency, and request rate.
++   - `POST /api/v1/engine/toggle`: Master toggle for `ENGINE_ENABLED`.
++   - `GET /api/v1/engine/proxies`: Returns total proxies count, available proxies, and quarantined IPs.
++   - `POST /api/v1/engine/proxies/quarantine`: Manually quarantines an IP.
++   - `POST /api/v1/engine/proxies/unquarantine`: Manually releases a quarantined IP.
++   - `GET /api/v1/engine/captcha`: Returns CapSolver & 2Captcha API health status, solve count, average duration, and success rate %.
++   - `POST /api/v1/engine/captcha/test`: Triggers a test CAPTCHA solve.
++   - `GET/POST /api/v1/engine/autocop`: Arm/Disarm AutoCop, adjust max spend cap (`autocop_max_spend_pence`), toggle dry-run mode, and retrieve live purchase logs.
++   - `GET /api/v1/engine/crosslister`: Returns connected venue account status (eBay, Vinted, Depop, Poshmark, Mercari) and active de-listing queue.
++
++2. Frontend Web UI Control Workbench (`src/arb/web/static/`):
++   - Add "Engine Control Center" tab to `index.html` with dark glassmorphism cards and live status badges.
++   - Extend `app.js` with reactive fetch functions polling `/api/v1/engine/*` endpoints.
++   - Add styling for status badges (Green = Active/Healthy, Amber = Quarantined/Warning, Red = Error) in `app.css`.
++
++3. Package Consolidation & Merge:
++   - Consolidate `engine/` into `src/arb/engine/`.
++   - Move `tests_engine/` to `tests/`.
++   - Update `pyproject.toml` wheel package build targets (`packages = ["src/arb"]`).
++
++---
++
++Verification:
++- Run `uv run ruff check .` and `uv run ruff format --check .`
++- Run `uv run mypy src tests scripts` (must pass with 0 errors)
++- Run `uv run python scripts/guard.py` (must output `guard: ok`)
++- Run `uv run pytest` (target: 650+ tests passing, >=85% coverage)
+
+# 2026-08-20 17:04:31.955068
++D
+
+# 2026-08-20 17:15:55.308207
++Y

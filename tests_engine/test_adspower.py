@@ -35,7 +35,9 @@ class TestAdsPowerClient:
             mock_client.post = fake_post  # type: ignore[assignment]
             mock_client_cls.return_value = mock_client
 
-            profile = await client.create_profile("test-profile", proxy_url="http://user:pass@host:8080")
+            profile = await client.create_profile(
+                "test-profile", proxy_url="http://user:pass@host:8080"
+            )
             assert isinstance(profile, BrowserProfile)
             assert profile.profile_id == "profile-1"
             assert profile.name == "test-profile"

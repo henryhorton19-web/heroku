@@ -9,7 +9,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from engine.config import get_engine_settings
 from engine.proxy import ProxyPool
 from engine.tls import TlsSession
 
@@ -175,4 +174,4 @@ async def publish_listing(
     A mapping from venue name to external listing id (or empty string on failure).
     """
     # Stub: return empty results for now
-    return {venue: "" for venue in target_venues}
+    return dict.fromkeys(target_venues, "")

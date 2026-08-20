@@ -7,13 +7,11 @@ returns a 503 with a descriptive message.
 
 from __future__ import annotations
 
-from typing import Any
-
+from engine.config import EngineSettings, get_engine_settings
+from engine.proxy import ProxyPool, ProxyPoolError
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from engine.config import EngineSettings, get_engine_settings
-from engine.proxy import ProxyPool
 
 # ---------------------------------------------------------------------------
 # Router
@@ -72,7 +70,7 @@ class AutoCopStatusResponse(BaseModel):
     armed: bool
     max_spend_pence: int
     dry_run: bool
-    recent_purchases: list[dict[str, Any]]
+    recent_purchases: list[dict[str, str | int | bool]]
 
 
 class AutoCopConfigRequest(BaseModel):
@@ -121,8 +119,9 @@ async def get_proxies() -> ProxyStatusResponse:
     _require_enabled()
     try:
         pool = ProxyPool.from_env()
-    except Exception:
+    except (ProxyPoolError, OSError, ValueError, RuntimeError):
         return ProxyStatusResponse(total=0, available=0, quarantined=[])
+
     return ProxyStatusResponse(
         total=pool.total_count,
         available=pool.available_count,

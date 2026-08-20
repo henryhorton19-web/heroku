@@ -15,7 +15,6 @@ import asyncio
 
 import typer
 
-from engine.adspower import AdsPowerClient
 from engine.autocop import attempt_checkout
 from engine.captcha import CaptchaSolver
 from engine.config import get_engine_settings
