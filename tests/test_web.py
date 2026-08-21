@@ -52,7 +52,7 @@ def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[TestClie
 def test_the_page_is_served(client: TestClient) -> None:
     response = client.get("/")
     assert response.status_code == 200
-    assert "trading console" in response.text
+    assert "trading console" in response.text.lower()
 
 
 def test_static_assets_are_served(client: TestClient) -> None:

@@ -147,9 +147,9 @@ class TlsSession:
             detected = detect_captcha(resp)
             if detected is not None:
                 captcha_type, site_key = detected
-                # Solve – note: captcha_solver methods are async, but this
+                # Solve - note: captcha_solver methods are async, but this
                 # method is sync.  We use asyncio.run() to bridge.
-                import asyncio  # noqa: PLC0415 – import inside method to avoid top-level import
+                import asyncio  # noqa: PLC0415 - import inside method to avoid top-level import
 
                 try:
                     if captcha_type == "turnstile":

@@ -1,6 +1,11 @@
-"""FastAPI application for the Arbitrage Dashboard.
+"""FastAPI application for the Arbitrage Trading Console.
 
-Serves the static frontend and REST API endpoints.
+Serves the static single-page frontend and the REST API in ``api.py``.
+
+The frontend is five tabs over one router. There is no second router: every
+figure the console shows is computed server-side in ``api.py`` and rendered
+verbatim, so the display cannot become a second opinion on the ranking or the
+margins.
 """
 
 from __future__ import annotations
@@ -16,13 +21,12 @@ from . import api, api_engine
 # Application
 # ---------------------------------------------------------------------------
 
-app = FastAPI(title="Arbitrage Dashboard", version="0.1.0")
+app = FastAPI(title="Arbitrage Trading Console", version="0.1.0")
 
-# Include API routers
 app.include_router(api.router)
 app.include_router(api_engine.router)
 
-# Mount static files
+
 static_dir = Path(__file__).resolve().parent / "static"
 app.mount("/static", StaticFiles(directory=str(static_dir)), name="static_files")
 app.mount("/", StaticFiles(directory=str(static_dir), html=True), name="static")

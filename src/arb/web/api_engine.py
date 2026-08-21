@@ -12,7 +12,6 @@ from engine.proxy import ProxyPool, ProxyPoolError
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-
 # ---------------------------------------------------------------------------
 # Router
 # ---------------------------------------------------------------------------

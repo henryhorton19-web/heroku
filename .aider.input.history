@@ -356,3 +356,9 @@
 +- `uv run pytest tests_engine/ tests/test_engine_api.py`
 +
 +Report back with a clear summary of all passed checks in English.
+
+# 2026-08-21 10:40:23.419757
++/model
+
+# 2026-08-21 10:42:15.175371
++aider --list-models openrouter/

@@ -2,19 +2,42 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Arbitrage trading console</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Arbitrage Trading Console</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="/static/app.css">
-
-
 </head>
 <body>
-  <nav id="nav">
-    <a href="#/dashboard" class="active">Dashboard</a>
-    <a href="#/engine">Engine Control Center</a>
-    <a href="#/provenance">Provenance</a>
-  </nav>
-  <main id="main"></main>
-  <script src="app.js"></script>
+  <div class="shell">
+    <header class="topbar">
+      <div class="brand">
+        <div class="mark">AV</div>
+        <div class="titles">
+          <h1>Arbitrage Trading Console</h1>
+          <p>Phase 1 &middot; personal book</p>
+        </div>
+      </div>
+      <div class="spacer"></div>
+      <div class="topbar-meta">
+        <span class="badge neutral hide-sm" id="fee-badge">fee table &mdash;</span>
+        <span class="badge neutral" id="db-badge"><span class="dot"></span> connecting</span>
+        <button class="btn" id="refresh" title="Reload the current tab">Refresh</button>
+      </div>
+    </header>
+
+    <nav class="tabs" role="tablist">
+      <button role="tab" data-tab="dashboard"  aria-selected="true">Executive Dashboard</button>
+      <button role="tab" data-tab="sourcing"   aria-selected="false">Sourcing Workbench</button>
+      <button role="tab" data-tab="inventory"  aria-selected="false">Inventory &amp; Hazards</button>
+      <button role="tab" data-tab="ledger"     aria-selected="false">Ledger, Fees &amp; Tax</button>
+      <button role="tab" data-tab="system"     aria-selected="false">System Telemetry</button>
+    </nav>
+
+    <main id="view" role="tabpanel"></main>
+  </div>
+
+  <div id="toasts"></div>
+  <script src="/static/app.js"></script>
 </body>
 </html>

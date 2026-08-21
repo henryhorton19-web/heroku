@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import pytest
-from arb.web.app import create_app
-
 from engine.config import get_engine_settings
 from fastapi.testclient import TestClient
+
+from arb.web.app import create_app
 
 
 @pytest.fixture

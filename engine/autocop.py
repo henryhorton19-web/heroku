@@ -81,7 +81,7 @@ _SESSIONS_URL = "https://www.vinted.fr/api/v2/sessions"
 _CHECKOUT_URL = "https://www.vinted.fr/api/v2/checkout"
 
 
-async def attempt_checkout(
+async def attempt_checkout(  # noqa: PLR0912
     listing_id: str,
     title: str,
     price_pence: int,
